@@ -49,7 +49,7 @@ function buildIndexes() {
 }
 
 /* ---------------- Navigation ---------------- */
-const TABS = ["chercher", "jouer", "dons", "votations", "parlement", "tendances", "debats", "nouveautes"];
+const TABS = ["chercher", "jouer", "absences", "lobbyistes", "dons", "votations", "parlement", "tendances", "debats", "nouveautes"];
 function route() {
   const [tab, q] = decodeURIComponent(location.hash.slice(1)).split(":");
   const t = TABS.includes(tab) ? tab : "chercher";
@@ -59,6 +59,8 @@ function route() {
   if (t === "chercher" && q != null && $("#q").value !== q) { $("#q").value = q; search(); }
   if (t === "tendances") { renderClassements(); renderTrends(); }
   if (t === "jouer") renderJouer(q);
+  if (t === "absences") renderAbsences();
+  if (t === "lobbyistes") renderLobbyistes();
   if (t === "debats") renderDebats();
   if (t === "parlement") renderParlVotes();
 }
@@ -130,16 +132,16 @@ const years = (ds) => { const y = uniq(ds.map((d) => d.annee)).sort(); return y.
 const linkBtn = (type, key, label) => `<button class="link" data-open="${type}" data-key="${esc(key)}">${esc(label)}</button>`;
 
 function donList(ds, who) {
-  return `<ul class="list">${[...ds].sort((a, b) => (b.montant || 0) - (a.montant || 0)).map((d) =>
+  return listMore([...ds].sort((a, b) => (b.montant || 0) - (a.montant || 0)).map((d) =>
     `<li><span>${who === "recip" ? linkBtn("recip", d.beneficiaire, d.beneficiaire) : linkBtn("donor", d.donateur, d.donateur)}</span><span class="amount money">${chf(d.montant)}</span>
-     <span class="sub">${esc(d.cat)}${d.camp ? ` (${d.camp.toLowerCase()})` : ""}. ${esc(d.evt)}${d.budget ? ". Budget, décompte final pas encore publié" : ""}${d.nature && d.nature !== "Monétaire" ? ". " + esc(d.nature) : ""}</span></li>`).join("")}</ul>`;
+     <span class="sub">${esc(d.cat)}${d.camp ? ` (${d.camp.toLowerCase()})` : ""}. ${esc(d.evt)}${d.budget ? ". Budget, décompte final pas encore publié" : ""}${d.nature && d.nature !== "Monétaire" ? ". " + esc(d.nature) : ""}</span></li>`), 10, "dons");
 }
 function sheetDonor(g) {
   if (!g) return "";
   const org = idx.orgNorm.get(norm(g.nom, true));
   const parties = {}; g.dons.forEach((d) => { const k = d.parti || (d.cat === "Votation" ? `Votations (${d.camp || "?"})` : "Autres"); parties[k] = (parties[k] || 0) + (d.montant || 0); });
   const split = Object.entries(parties).sort((a, b) => b[1] - a[1]);
-  return `<h2>${esc(g.nom)}</h2><p class="note">${esc(g.type)}. ${esc(g.secteur)}${g.lieu ? ". " + esc(g.lieu) : ""}</p>
+  return `<h2>${esc(g.nom)}</h2><p class="note">${deHint(g.nom)} ${esc(g.type)}. ${esc(g.secteur)}${g.lieu ? ". " + esc(g.lieu) : ""}</p>
   <div class="kpis">${kpi(chf(g.total), "donnés au total", "money")}${kpi(g.dons.length, "dons déclarés")}${kpi(years(g.dons), "période")}</div>
   <section><h3>Répartition</h3>${bars(split.map(([k, v]) => ({ label: k, value: v })), "m")}</section>
   ${org ? `<section><h3>Aussi présent au Parlement</h3><p>${linkBtn("org", org.nom, org.nom)} a des liens avec ${uniq(org.liens.map((l) => l.p)).length} parlementaire(s).</p></section>` : ""}
@@ -163,19 +165,19 @@ function sheetElu(e) {
   <div><h2>${esc(e.nom)}</h2><p class="note">${esc(e.parti)}, ${esc(e.canton)}, ${esc(e.conseil)}${e.profession ? ". " + esc(e.profession) : ""}${e.commissions ? `. Commissions : ${esc(e.commissions)}` : ""}</p></div></div>
   <div class="kpis">${kpi(e.liens.length, "mandats en cours", "infl")}${kpi(paid.length, "rémunérés")}${kpi(known ? chf(known) : "–", "montants communiqués / an")}</div>
   <section><h3>Secteurs</h3>${bars(Object.entries(sect).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v })), "i", (v) => v)}</section>
-  <section><h3>Mandats</h3><ul class="list">${[...e.liens].sort((a, b) => (b.statut === "remunere") - (a.statut === "remunere") || (b.montant || 0) - (a.montant || 0)).map((l) =>
-    `<li><span>${linkBtn("org", l.org, l.org)}</span><span class="tag ${l.statut === "remunere" ? "paid" : ""}">${l.montant ? chf(l.montant) : STATUT[l.statut]}</span>
-     <span class="sub">${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}. ${esc(l.secteur)}${l.principal ? ". Activité principale" : ""}</span></li>`).join("") || "<li>Aucun mandat déclaré.</li>"}</ul></section>
+  <section><h3>Mandats</h3>${e.liens.length ? listMore([...e.liens].sort((a, b) => (b.statut === "remunere") - (a.statut === "remunere") || (b.montant || 0) - (a.montant || 0)).map((l) =>
+    `<li><span>${linkBtn("org", l.org, l.org)} ${deHint(l.org)}</span><span class="tag ${l.statut === "remunere" ? "paid" : ""}">${l.montant ? chf(l.montant) : STATUT[l.statut]}</span>
+     <span class="sub">${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}. ${esc(l.secteur)}${l.principal ? ". Activité principale" : ""}</span></li>`), 8, "mandats") : `<p class="note">Aucun mandat déclaré.</p>`}</section>
   ${e.conseil === "CN" ? `<section><h3>Votes au Conseil national</h3><div id="elu-votes"><p class="note">Chargement…</p></div></section>` : ""}
-  ${e.badges.length ? `<section><h3>Badges d'accès donnés</h3><ul class="list">${e.badges.map((b) => `<li><span>${esc(b.nom)}</span><span></span><span class="sub">${esc(b.fonction)}${b.mandats.length ? ". " + esc(b.mandats.join(", ")) : ""}</span></li>`).join("")}</ul></section>` : ""}
+  ${e.badges.length ? `<section><h3>Badges d'accès donnés</h3><ul class="list">${e.badges.map((b) => `<li><span>${esc(b.nom)}</span><span class="tag ${badgeType(b) === "Lobbyiste" ? "paid" : ""}">${esc(badgeType(b))}</span><span class="sub">${esc(trBadge(b.fonction))} ${deHint(b.fonction)}${b.mandats.length ? ". " + esc(b.mandats.join(", ")) : ""}</span></li>`).join("")}</ul></section>` : ""}
   <p>${e.parlement ? `<a href="${esc(e.parlement)}" target="_blank" rel="noopener">Fiche officielle sur parlament.ch</a> · ` : ""}<a href="${esc(e.url)}" target="_blank" rel="noopener">Fiche complète sur Lobbywatch</a></p>`;
 }
 function sheetOrg(o) {
   if (!o) return "";
   const donor = idx.donorNorm.get(norm(o.nom, true));
-  return `<h2>${esc(o.nom)}</h2><p class="note">${esc(o.groupe)}. ${esc(o.secteur)}</p>
+  return `<h2>${esc(o.nom)}</h2><p class="note">${deHint(o.nom)} ${esc(o.groupe)}. ${esc(o.secteur)}</p>
   <div class="kpis">${kpi(uniq(o.liens.map((l) => l.p)).length, "élus liés", "infl")}${kpi(o.liens.filter((l) => l.statut === "remunere").length, "mandats rémunérés")}${donor ? kpi(chf(donor.total), "dons déclarés", "money") : ""}</div>
-  <section><h3>Parlementaires liés</h3><ul class="list">${o.liens.map((l) => { const e = idx.elu.get(l.p); return e ? `<li><span>${linkBtn("elu", e.id, e.nom)}</span><span class="tag ${l.statut === "remunere" ? "paid" : ""}">${l.montant ? chf(l.montant) : STATUT[l.statut]}</span><span class="sub">${esc(e.parti)}, ${esc(e.canton)}. ${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}</span></li>` : ""; }).join("")}</ul></section>
+  <section><h3>Parlementaires liés</h3>${listMore(o.liens.map((l) => { const e = idx.elu.get(l.p); return e ? `<li><span>${linkBtn("elu", e.id, e.nom)}</span><span class="tag ${l.statut === "remunere" ? "paid" : ""}">${l.montant ? chf(l.montant) : STATUT[l.statut]}</span><span class="sub">${esc(e.parti)}, ${esc(e.canton)}. ${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}</span></li>` : ""; }).filter(Boolean), 10, "parlementaires")}</section>
   ${donor ? `<section><h3>Dons de cette organisation</h3>${donList(donor.dons, "recip")}</section>` : ""}`;
 }
 
@@ -395,7 +397,7 @@ function renderHemis() {
 
 /* ---------------- Votes au Conseil national ---------------- */
 let PARL = null, parlLoading = null;
-const DECI = { o: ["Oui", "var(--yes)"], n: ["Non", "var(--no)"], a: ["Abstention", "var(--abst)"], "-": ["Absent·e", "var(--absent)"], p: ["Préside", "var(--absent)"] };
+const DECI = { o: ["Oui", "var(--yes)"], n: ["Non", "var(--no)"], a: ["Abstention", "var(--abst)"], "-": ["Absent·e", "var(--absent)"], e: ["Excusé·e", "var(--excuse)"], p: ["Préside", "var(--absent)"] };
 const P_CHANCE = 0.0027;  // probabilité d'un |z| ≥ 3 par pur hasard
 function loadParl() {
   return parlLoading ||= getJSON("parlement", null).then((p) => {
@@ -408,8 +410,8 @@ function loadParl() {
 }
 const affaireUrl = (objet) => { const m = /^(\d\d)\.(\d+)$/.exec(objet || ""); return m ? `https://www.parlament.ch/fr/ratsbetrieb/suche-curia-vista/geschaeft?AffairId=${+m[1] > 50 ? 19 : 20}${m[1]}${m[2].padStart(4, "0")}` : ""; };
 const decision = (s, pn) => { const i = PARL.pnIndex.get(pn); return i == null ? " " : (s[8][i] || " "); };
-const scrutinTitre = (s) => `${s[3]}${s[5] ? ` (${s[5]})` : ""}`;
-function tally(s) { const c = { o: 0, n: 0, a: 0, "-": 0 }; for (const ch of s[8]) if (ch in c) c[ch]++; return c; }
+const scrutinTitre = (s) => `${s[3]}${s[5] ? ` (${trVote(s[5])})` : ""}`;
+function tally(s) { const c = { o: 0, n: 0, a: 0, "-": 0, e: 0 }; for (const ch of s[8]) if (ch in c) c[ch]++; return c; }
 
 async function renderParlVotes() {
   const box = $("#cn-votes");
@@ -455,17 +457,17 @@ function sheetScrutin(id) {
   if (!s) return "";
   const c = tally(s), url = affaireUrl(s[2]);
   const groupes = {};
-  PARL.membres.forEach((m, i) => { const d = s[8][i]; if (!d || d === " ") return; const g = groupes[m[2] || "?"] ||= { o: 0, n: 0, a: 0, "-": 0 }; if (d in g) g[d]++; });
+  PARL.membres.forEach((m, i) => { const d = s[8][i]; if (!d || d === " ") return; const g = groupes[m[2] || "?"] ||= { o: 0, n: 0, a: 0, "-": 0, e: 0 }; if (d in g) g[d]++; });
   const GLAB = Object.fromEntries(FRACTIONS);
   const options = Object.entries(PARL.interets_membres).sort((a, b) => a[0].localeCompare(b[0]));
   return `<h2>${esc(s[3])}</h2><p class="note">Conseil national, ${esc(dateFr(s[1]))}. Objet ${esc(s[2])}${s[4] ? ` : ${esc(s[4])}` : ""}${s[5] ? `. ${esc(s[5])}` : ""}</p>
-  <ul class="list"><li><span><b class="infl">Oui</b> : ${esc(s[6] || "–")}</span><span></span></li><li><span><b class="money">Non</b> : ${esc(s[7] || "–")}</span><span></span></li></ul>
-  <div class="kpis">${kpi(c.o, "oui", "infl")}${kpi(c.n, "non", "money")}${kpi(c.a, "abstentions")}${kpi(c["-"], "absent·e·s")}</div>
+  <ul class="list"><li><span><b class="infl">Oui</b> : <span title="${esc(s[6])}">${esc(trVote(s[6]) || "–")}</span></span><span></span></li><li><span><b class="money">Non</b> : <span title="${esc(s[7])}">${esc(trVote(s[7]) || "–")}</span></span><span></span></li></ul>
+  <div class="kpis">${kpi(c.o, "oui", "infl")}${kpi(c.n, "non", "money")}${kpi(c.a, "abstentions")}${kpi(c["-"], "absent·e·s")}${kpi(c.e, "excusé·e·s")}</div>
   <section><h3>Qui a voté quoi</h3><div id="sc-hemi" data-id="${esc(String(id))}">${hemiScrutin(s)}</div>
     <div class="filters"><select id="sc-groupe" aria-label="Mettre en évidence un groupe d'intérêts"><option value="">Mettre en évidence : les élus liés à…</option>${options.map(([g]) => `<option>${esc(g)}</option>`).join("")}</select></div>
     <p class="summary" id="sc-ecart"></p></section>
   <section><h3>Par groupe parlementaire</h3><div class="table-wrap"><table><thead><tr><th>Groupe</th><th class="num">Oui</th><th class="num">Non</th><th class="num">Abst.</th><th class="num">Abs.</th></tr></thead>
-    <tbody>${Object.entries(groupes).sort((a, b) => (b[1].o + b[1].n) - (a[1].o + a[1].n)).map(([g, v]) => `<tr><td>${esc(GLAB[g] || g)}</td><td class="num infl">${v.o}</td><td class="num money">${v.n}</td><td class="num">${v.a}</td><td class="num">${v["-"]}</td></tr>`).join("")}</tbody></table></div></section>
+    <tbody>${Object.entries(groupes).sort((a, b) => (b[1].o + b[1].n) - (a[1].o + a[1].n)).map(([g, v]) => `<tr><td>${esc(GLAB[g] || g)}</td><td class="num infl">${v.o}</td><td class="num money">${v.n}</td><td class="num">${v.a}</td><td class="num">${v["-"] + v.e}</td></tr>`).join("")}</tbody></table></div></section>
   ${url ? `<p><a href="${esc(url)}" target="_blank" rel="noopener">Dossier de l'objet sur parlament.ch</a></p>` : ""}`;
 }
 function hemiScrutin(s, focus) {
@@ -473,7 +475,7 @@ function hemiScrutin(s, focus) {
   const paint = (e) => { const d = decision(s, e.pn); const [lbl, col] = DECI[d] || ["Pas en fonction", "none"];
     return { fill: col, dim: set && !set.has(e.pn), title: lbl }; };
   const c = tally(s);
-  return hemicycle("CN", 200, 8, paint, `<div class="legend wrap-l">${["o", "n", "a", "-"].map((k) => `<span><i style="background:${DECI[k][1]}"></i>${DECI[k][0]} <b>${c[k]}</b></span>`).join("")}</div>`);
+  return hemicycle("CN", 200, 8, paint, `<div class="legend wrap-l">${["o", "n", "a", "-", "e"].map((k) => `<span><i style="background:${DECI[k][1]}"></i>${DECI[k][0]} <b>${c[k]}</b></span>`).join("")}</div>`);
 }
 function focusScrutin(g) {
   const box = $("#sc-hemi"); if (!box) return;
@@ -496,7 +498,7 @@ async function fillEluVotes(e) {
   const p = await loadParl(); if (!p || $("#elu-votes") !== box) return;
   const st = p.elus[e.id];
   if (!st) { box.innerHTML = `<p class="note">Pas de vote nominal pour cette législature.</p>`; return; }
-  box.innerHTML = `<div class="kpis">${kpi(st.participation != null ? pct(st.participation) : "–", "participation aux votes")}${kpi(nf.format(st.contre_groupe), "votes contre la majorité de son groupe")}</div>
+  box.innerHTML = `${e.contexte ? `<p class="ctx">ⓘ ${esc(e.contexte.note)}${e.contexte.source ? ` <a href="${esc(e.contexte.source)}" target="_blank" rel="noopener">Source</a>` : ""}</p>` : ""}<div class="kpis">${kpi(st.participation != null ? pct(st.participation) : "–", "participation aux votes")}${kpi(nf.format(st.absences), "votes manqués sans excuse", "money")}${kpi(nf.format(st.excuses), "absences excusées")}${kpi(nf.format(st.contre_groupe), "votes contre la majorité de son groupe")}</div>
   ${st.recents.length ? `<p class="note">Derniers votes contre son groupe :</p><ul class="list">${st.recents.map((id) => { const s = p.idx.get(String(id)); return s ? `<li><span>${linkBtn("scrutin", id, scrutinTitre(s))}</span><span class="tag">${esc(DECI[decision(s, e.pn)]?.[0] || "")}</span><span class="sub">${esc(dateFr(s[1]))} · ${esc(s[2])}</span></li>` : ""; }).join("")}</ul>` : ""}`;
 }
 async function fillVoteFinal(v) {
@@ -651,12 +653,13 @@ function renderClassements() {
     if (!p) return;
     const st = L.elus.filter((e) => p.elus[e.id] && e.conseil === "CN").map((e) => ({ e, ...p.elus[e.id] }));
     const fr = [...st].sort((a, b) => b.contre_groupe - a.contre_groupe).slice(0, 12);
-    const ab = st.filter((x) => x.participation != null).sort((a, b) => a.participation - b.participation).slice(0, 12);
+    const ab = st.filter((x) => x.scrutins).sort((a, b) => b.absences / b.scrutins - a.absences / a.scrutins).slice(0, 12);
     $("#cl-frondeurs").innerHTML = `<h3>Qui vote le plus souvent contre son groupe ?</h3><p class="hint">Votes oui ou non contraires à la majorité de son groupe parlementaire, législature en cours, Conseil national. Les élus de petits partis rattachés à un grand groupe (PEV avec le Centre, par exemple) ressortent naturellement.</p>
       ${bars(fr.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.contre_groupe, open: ["elu", x.e.id] })), "i", (v) => nf.format(v))}
       ${shareBtn("frondeurs", () => shareCard({ kicker: "Les frondeurs du Conseil national", title: `${fr[0].e.nom} (${fr[0].e.parti}) a voté contre son groupe`, big: `${nf.format(fr[0].contre_groupe)} fois`, bigColor: "#1F5F8B", lines: ["depuis décembre 2023.", `Suivent : ${fr.slice(1, 4).map((x) => `${x.e.nom} (${nf.format(x.contre_groupe)})`).join(", ")}.`], text: "Qui vote le plus contre son propre groupe au Conseil national ?", file: "frondeurs.png" }))}`;
-    $("#cl-absents").innerHTML = `<h3>Qui manque le plus de votes ?</h3><p class="hint">Part des votes auxquels l'élu n'a pas pris part (absent ou excusé), législature en cours. Un congé maladie ou maternité, ou une élection en cours de législature, peut l'expliquer.</p>
-      ${bars(ab.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: 100 - x.participation, open: ["elu", x.e.id] })), "m", (v) => pctInt(v))}`;
+    $("#cl-absents").innerHTML = `<h3>Qui manque le plus de votes ?</h3><p class="hint">Part des votes manqués sans excuse enregistrée, législature en cours, Conseil national. Les données ne disent pas pourquoi un élu était absent.</p>
+      ${bars(ab.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: 100 * x.absences / x.scrutins, open: ["elu", x.e.id] })), "m", (v) => pctInt(v))}
+      <p><a class="btn ghost" href="#absences">Le classement complet</a></p>`;
   });
 }
 
@@ -817,6 +820,126 @@ async function gameCanton(box, run) {
         <div class="kpis small">${kpi(e.liens.length, "mandats", "infl")}${kpi(paid, "rémunérés", "money")}${st?.participation != null ? kpi(pctInt(st.participation), "présence aux votes") : ""}${st ? kpi(nf.format(st.contre_groupe), "votes contre son groupe") : ""}</div>
         ${shareBtn(`elu-${e.id}`, () => shareCard({ kicker: `Mes élus · ${e.canton}`, title: `${e.nom} (${e.parti}, ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"})`, big: `${e.liens.length} mandats`, bigColor: "#1F5F8B", lines: [`dont ${paid} rémunérés, selon Lobbywatch.`, ...(st ? [`Présence aux votes : ${pctInt(st.participation)}. Votes contre son groupe : ${nf.format(st.contre_groupe)}.`] : []), "Qui sont les élus de ton canton ?"], text: `${e.nom} : ${e.liens.length} mandats dont ${paid} rémunérés.`, file: `elu-${e.id}.png` }), "Partager")}</div>`; }).join("")}</div>`;
   $("#mc-canton").addEventListener("input", (ev) => { location.hash = `#jouer:canton:${ev.target.value}`; });
+}
+
+/* ---------------- Traductions indicatives de l'allemand ---------------- */
+// Mots fréquents dans les noms d'organisations : affichés en petit, pour les non-germanophones
+const GLOSSAIRE = [
+  ["krankenversicherung", "assurance-maladie"], ["versicherung", "assurance"], ["bankiervereinigung", "Association des banquiers"],
+  ["hauseigentümerverband", "association des propriétaires"], ["gewerkschaftsbund", "union syndicale"], ["gewerkschaft", "syndicat"],
+  ["gewerbeverband", "union des arts et métiers"], ["bauernverband", "union des paysans"], ["baumeisterverband", "société des entrepreneurs"],
+  ["arbeitgeberverband", "union patronale"], ["handelskammer", "chambre de commerce"], ["pensionskasse", "caisse de pension"],
+  ["ausgleichskasse", "caisse de compensation"], ["vorsorge", "prévoyance"], ["landwirtschaft", "agriculture"], ["wirtschaft", "économie"],
+  ["genossenschaft", "coopérative"], ["gesellschaft", "société"], ["stiftung", "fondation"], ["vereinigung", "association"],
+  ["verband", "association"], ["verein", "association"], ["schweizerisch", "suisse"], ["schweizer", "suisse"], ["schweiz", "Suisse"],
+  ["bürgerlich", "bourgeois (centre-droit)"], ["politik", "politique"], ["gesundheit", "santé"], ["spital", "hôpital"], ["ärzte", "médecins"],
+  ["apotheker", "pharmaciens"], ["pflege", "soins"], ["umwelt", "environnement"], ["naturschutz", "protection de la nature"],
+  ["verkehr", "transports"], ["eisenbahn", "chemin de fer"], ["bildung", "formation"], ["hochschule", "haute école"], ["forschung", "recherche"],
+  ["immobilien", "immobilier"], ["treuhand", "fiduciaire"], ["anwalt", "avocat"], ["aufzüge", "ascenseurs"], ["kraftwerk", "centrale"],
+  ["strom", "électricité"], ["wasser", "eau"], ["milch", "lait"], ["fleisch", "viande"], ["holz", "bois"], ["wald", "forêt"],
+  ["frauen", "femmes"], ["jugend", "jeunesse"], ["tourismus", "tourisme"], ["freiheit", "liberté"], ["bund", "Confédération"],
+  ["kanton", "canton"], ["komitee", "comité"], ["beirat", "conseil consultatif"], ["vorstand", "comité"], ["handel", "commerce"], ["unternehmen", "entreprise"],
+];
+function deHint(text) {
+  const words = String(text || "").toLowerCase().split(/[^a-zäöüß]+/).filter((w) => w.length > 3);
+  const seen = new Set(), out = [];
+  for (const w of words) {
+    const hit = GLOSSAIRE.find(([k]) => w.startsWith(k) || (k.length > 6 && w.includes(k)));
+    if (hit && !seen.has(hit[1])) { seen.add(hit[1]); out.push(`${hit[0]} = ${hit[1]}`); }
+  }
+  return out.length ? `<span class="de-hint" title="Traduction indicative des mots allemands">≈ ${esc(out.slice(0, 4).join(" · "))}</span>` : "";
+}
+// Libellés des votes du Conseil national, parfois publiés en allemand seulement
+const PHRASES = [
+  [/Empfehlung auf Ablehnung der Volksinitiative/g, "recommandation de rejeter l'initiative"], [/Empfehlung auf Annahme der Volksinitiative/g, "recommandation d'accepter l'initiative"],
+  [/Antrag der Mehrheit/g, "Proposition de la majorité de la commission"], [/Antrag der Minderheit/g, "Proposition de la minorité"],
+  [/Antrag des Bundesrates/g, "Proposition du Conseil fédéral"], [/und des Bundesrates/g, "et du Conseil fédéral"], [/Antrag/g, "Proposition"],
+  [/Annahme der Vorlage/g, "Adoption du projet"], [/Ablehnung der Vorlage/g, "Rejet du projet"], [/Annahme der Motion/g, "Adopter la motion"],
+  [/Ablehnung der Motion/g, "Rejeter la motion"], [/Annahme des Postulates/g, "Adopter le postulat"], [/Ablehnung des Postulates/g, "Rejeter le postulat"],
+  [/keine Folge geben/g, "ne pas donner suite"], [/Folge geben/g, "donner suite"], [/Nichteintreten/g, "Non-entrée en matière"], [/Eintreten/g, "Entrée en matière"],
+  [/keine Rückweisung/g, "pas de renvoi"], [/Rückweisung/g, "renvoi"], [/Zustimmung/g, "approbation"], [/Festhalten/g, "maintenir"], [/Streichen/g, "biffer"],
+  [/Annahme/g, "adoption"], [/Ablehnung/g, "rejet"], [/Abschreiben/g, "classer"], [/\bAbs\./g, "al."], [/\bBst\./g, "let."], [/\bZiff\./g, "ch."],
+];
+const trVote = (s) => PHRASES.reduce((t, [re, fr]) => t.replace(re, fr), String(s || ""));
+const trBadge = (s) => String(s || "").replace(/Interessenvertreter\/in/g, "Représentant·e d'intérêts").replace(/Persönliche\/r Mitarbeiter\/in/g, "Collaborateur·trice personnel·le").replace(/^Gast$/, "Invité·e");
+
+/* Contexte édité à la main (config/contexte_elus.csv), affiché à côté des chiffres sensibles */
+const ctxNote = (e) => (e.contexte ? `<span class="ctx">ⓘ ${esc(e.contexte.note)}</span>` : "");
+
+/* Listes longues : les premiers éléments, puis « Afficher plus » */
+function listMore(items, n = 8, label = "éléments") {
+  if (items.length <= n) return `<ul class="list">${items.join("")}</ul>`;
+  return `<ul class="list">${items.slice(0, n).join("")}</ul><details class="more"><summary>Afficher les ${items.length - n} autres ${esc(label)}</summary><ul class="list">${items.slice(n).join("")}</ul></details>`;
+}
+
+/* ---------------- Absences ---------------- */
+async function renderAbsences() {
+  const box = $("#t-abs"); if (!box) return;
+  const p = await loadParl();
+  if (!p) { $("#s-abs").textContent = "Votes indisponibles pour l'instant."; return; }
+  const rows = L.elus.filter((e) => e.conseil === "CN" && p.elus[e.id]).map((e) => { const s = p.elus[e.id];
+    return { e, s, taux: 100 * s.absences / s.scrutins, tauxE: 100 * s.excuses / s.scrutins }; });
+  if (!$("#fa-tri")) {
+    $("#f-abs").innerHTML = `<select id="fa-tri" aria-label="Tri"><option value="abs">Absences non excusées</option><option value="pres">Présence la plus basse</option><option value="exc">Absences excusées</option></select>
+      ${select("fa-parti", "Parti", uniq(rows.map((r) => r.e.parti)).sort())}${select("fa-canton", "Canton", uniq(rows.map((r) => r.e.canton)).sort())}
+      <input type="search" id="fa-q" placeholder="Nom…" aria-label="Chercher un élu">`;
+    $("#f-abs").addEventListener("input", renderAbsences);
+  }
+  const f = { tri: $("#fa-tri").value, parti: $("#fa-parti").value, canton: $("#fa-canton").value, q: norm($("#fa-q").value) };
+  const list = rows.filter((r) => (!f.parti || r.e.parti === f.parti) && (!f.canton || r.e.canton === f.canton) && (!f.q || r.e._n.includes(f.q)))
+    .sort({ abs: (a, b) => b.taux - a.taux, pres: (a, b) => a.s.participation - b.s.participation, exc: (a, b) => b.tauxE - a.tauxE }[f.tri]);
+  const moy = sum(rows, (r) => r.taux) / rows.length;
+  $("#s-abs").innerHTML = `${list.length} élus · en moyenne, un conseiller national n'a pas pris part à <b>${num1(moy)} %</b> des votes sans être excusé ${shareBtn("absences-top", () => { const t = [...rows].sort((a, b) => b.taux - a.taux).slice(0, 3);
+    return shareCard({ kicker: "Qui manque le plus de votes ?", title: "Conseil national : les absences non excusées les plus fréquentes depuis décembre 2023", big: `${pctInt(t[0].taux)}`, bigColor: "#C8202A", lines: t.map((r, i) => `${i + 1}. ${r.e.nom} (${r.e.parti}, ${r.e.canton}) : ${nf.format(r.s.absences)} votes manqués sur ${nf.format(r.s.scrutins)}`).concat([`Moyenne : ${num1(moy)} %. Les données ne disent pas pourquoi un élu était absent.`]), text: "Qui manque le plus de votes au Conseil national ?", file: "absences.png" }); })}`;
+  box.innerHTML = `<thead><tr><th>Élu</th><th class="hide-s">Parti</th><th class="num">Non excusées</th><th class="num hide-s">Excusées</th><th class="num">Présence</th></tr></thead>
+    <tbody>${list.map((r) => `<tr class="click" data-open="elu" data-key="${r.e.id}"><td><span class="who">${avatar(r.e)}<span><strong>${esc(r.e.nom)}</strong><br><small>${esc(r.e.parti)}, ${esc(r.e.canton)}</small>${ctxNote(r.e)}</span></span></td>
+      <td class="hide-s">${esc(r.e.parti)}</td><td class="num"><strong class="money">${pct(r.taux)}</strong><br><small>${nf.format(r.s.absences)} votes</small></td>
+      <td class="num hide-s">${nf.format(r.s.excuses)}</td><td class="num">${pct(r.s.participation)}</td></tr>`).join("")}</tbody>`;
+}
+
+/* ---------------- Lobbyistes ---------------- */
+const badgeType = (b) => (/interessenvertreter|représentant|repräsentant/i.test(b.fonction) ? "Lobbyiste" : /mitarbeiter|collaborat/i.test(b.fonction) ? "Collaborateur·trice" : /gast|invit/i.test(b.fonction) ? "Invité·e" : "Autre");
+function renderLobbyistes() {
+  const box = $("#l-lob"); if (!box) return;
+  const badges = L.badges.map((b) => ({ b, e: idx.elu.get(b.p), type: badgeType(b), org: orgBadge(b) })).filter((x) => x.e);
+  if (!$("#fl-type")) {
+    const lob = badges.filter((x) => x.type === "Lobbyiste");
+    $("#k-lob").innerHTML = kpi(badges.length, "badges d'accès permanents donnés par des élus") + kpi(lob.length, "à des représentants d'intérêts déclarés", "money") + kpi(uniq(lob.map((x) => x.e.id)).length, "élus font entrer au moins un lobbyiste", "infl");
+    $("#f-lob").innerHTML = `<select id="fl-type" aria-label="Type de badge"><option>Lobbyiste</option><option value="">Tous les badges</option><option>Collaborateur·trice</option><option>Invité·e</option></select>
+      ${select("fl-parti", "Parti de l'élu", uniq(badges.map((x) => x.e.parti)).sort())}${select("fl-canton", "Canton", uniq(badges.map((x) => x.e.canton)).sort())}
+      <input type="search" id="fl-q" placeholder="Lobbyiste, organisation, élu…" aria-label="Chercher">`;
+    $("#f-lob").addEventListener("input", renderLobbyistes);
+  }
+  const f = { type: $("#fl-type").value, parti: $("#fl-parti").value, canton: $("#fl-canton").value, q: norm($("#fl-q").value).split(" ").filter(Boolean) };
+  const list = badges.filter((x) => (!f.type || x.type === f.type) && (!f.parti || x.e.parti === f.parti) && (!f.canton || x.e.canton === f.canton)
+    && (!f.q.length || matchAll(norm(`${x.b.nom} ${x.b.fonction} ${x.b.mandats.join(" ")} ${x.e.nom}`), f.q)));
+  const hotes = new Map(); list.forEach((x) => { if (!hotes.has(x.e.id)) hotes.set(x.e.id, []); hotes.get(x.e.id).push(x); });
+  const orgs = {}; list.filter((x) => x.org).forEach((x) => { orgs[x.org] = (orgs[x.org] || 0) + 1; });
+  const topOrgs = Object.entries(orgs).sort((a, b) => b[1] - a[1]).filter(([, n]) => n > 1).slice(0, 10);
+  box.innerHTML = `${topOrgs.length ? `<div class="card"><h3>Les organisations qui ont le plus de badges</h3>${bars(topOrgs.map(([k, v]) => ({ label: k, value: v })), "m", (v) => v)}</div>` : ""}
+    <p class="summary">${list.length} badge${list.length > 1 ? "s" : ""}, donnés par ${hotes.size} élu${hotes.size > 1 ? "s" : ""}</p>
+    <div class="elu-cards">${[...hotes.values()].sort((a, b) => b.length - a.length || a[0].e.nom.localeCompare(b[0].e.nom)).map((xs) => { const e = xs[0].e;
+      return `<div class="card elu-card"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="56" height="56" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.canton)} · ${esc(e.conseil)}</small></span></button>
+        <p class="note">fait entrer au Palais fédéral :</p>
+        <ul class="list">${xs.map((x) => `<li><span><strong>${esc(x.b.nom)}</strong></span><span class="tag ${x.type === "Lobbyiste" ? "paid" : ""}">${esc(x.type)}</span>
+          <span class="sub">${esc(x.org || trBadge(x.b.fonction))}${x.org ? " " + deHint(x.org) : ""}${x.b.mandats.length && x.b.mandats[0] !== x.org ? ` · aussi : ${esc(x.b.mandats.slice(0, 3).join(", "))}` : ""}</span></li>`).join("")}</ul>
+        ${shareBtn(`lob-${e.id}`, () => shareCard({ kicker: "Qui fait entrer qui au Parlement", title: `${e.nom} (${e.parti}, ${e.canton}) a donné son badge d'accès permanent à`, lines: xs.map((x) => `${x.b.nom} : ${x.org || trBadge(x.b.fonction)}`).concat(["Chaque parlementaire peut faire entrer deux personnes au Palais fédéral."]), text: `Qui ${e.nom} fait-il entrer au Parlement ?`, file: `badges-${e.id}.png` }), "Partager")}</div>`; }).join("") || `<p class="empty">Aucun badge pour ces filtres.</p>`}</div>`;
+}
+
+/* ---------------- À la une (accueil) ---------------- */
+async function renderUne() {
+  const box = $("#une"); if (!box) return;
+  const lob = L.badges.filter(isLobbyiste), hosts = {}; lob.forEach((b) => { hosts[b.p] = (hosts[b.p] || 0) + 1; });
+  const topH = Object.entries(hosts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p]) => idx.elu.get(+p)).filter(Boolean);
+  const ag = argentGagne();
+  const cardA = (id, body) => `<a class="card une-card" href="#${id}">${body}</a>`;
+  const html = (abs) => cardA("absences", `<p class="eyebrow-s">Absences</p><h3>Qui manque le plus de votes au Parlement ?</h3>${abs}<span class="go">Voir le classement →</span>`)
+    + cardA("lobbyistes", `<p class="eyebrow-s">Lobbyistes</p><h3>${lob.length} lobbyistes entrent au Palais fédéral grâce au badge d'un élu</h3><p class="note">Parmi ceux qui en font entrer : ${topH.map((e) => esc(e.nom)).join(", ")}…</p><span class="go">Qui fait entrer qui →</span>`)
+    + (ag.rows.length ? cardA("tendances", `<p class="eyebrow-s">Votations</p><h3>L'argent gagne-t-il ?</h3><p class="big money">${ag.n} sur ${ag.rows.length}</p><p class="note">votations gagnées par le camp qui a dépensé le plus</p><span class="go">Tous les classements →</span>`) : "");
+  box.innerHTML = html(`<p class="note">Chargement…</p>`);
+  const p = await loadParl(); if (!p) return;
+  const t = L.elus.filter((e) => e.conseil === "CN" && p.elus[e.id]).map((e) => ({ e, taux: 100 * p.elus[e.id].absences / p.elus[e.id].scrutins })).sort((a, b) => b.taux - a.taux).slice(0, 3);
+  box.innerHTML = html(`<ol class="podium">${t.map((r) => `<li><span>${esc(r.e.nom)} <small>(${esc(r.e.parti)})</small>${ctxNote(r.e)}</span><b class="money">${pctInt(r.taux)}</b></li>`).join("")}</ol><p class="note">des votes manqués sans excuse, depuis décembre 2023</p>`);
 }
 
 /* ---------------- Débats ---------------- */
@@ -1074,7 +1197,7 @@ document.addEventListener("input", (ev) => {
 
 (async function init() {
   [M, A, L, C, T, V] = await Promise.all([getJSON("meta", {}), getJSON("argent", { dons: [], campagnes: [] }), getJSON("lobby", { elus: [], liens: [], badges: [] }), getJSON("changes", []), getJSON("timeline", []), getJSON("votations", [])]);
-  buildIndexes(); status(); suggestions(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
+  buildIndexes(); status(); suggestions(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
   $("#fdb-tri").addEventListener("input", renderDebats);
   if (!API) $('.tabs a[data-tab="debats"]').hidden = true;  // onglet masqué tant que l'API n'est pas configurée (site/config.js)
   let timer; $("#q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(search, 120); });

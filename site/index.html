@@ -18,6 +18,8 @@
     <nav class="tabs" aria-label="Sections">
       <a href="#chercher" data-tab="chercher">Chercher</a>
       <a href="#jouer" data-tab="jouer">Jouer</a>
+      <a href="#absences" data-tab="absences">Absences</a>
+      <a href="#lobbyistes" data-tab="lobbyistes">Lobbyistes</a>
       <a href="#dons" data-tab="dons">Dons</a>
       <a href="#votations" data-tab="votations">Votations</a>
       <a href="#parlement" data-tab="parlement">Parlement</a>
@@ -38,6 +40,7 @@
       <input id="q" type="search" placeholder="UBS, Blocher, assurance, Wehrli…" autocomplete="off" autofocus>
     </label>
     <div class="chips" id="suggest"></div>
+    <div class="grid une" id="une"></div>
     <a class="promo" href="#jouer:match"><b>Nouveau : vote comme un élu.</b> Répondez à 10 vrais votes du Conseil national et découvrez quels élus votent comme vous, et qui les finance. <span>Jouer →</span></a>
     <div id="results"></div>
   </section>
@@ -81,6 +84,22 @@
     <p class="note">Explorer les données en jouant. Toutes les réponses viennent des registres officiels et de Lobbywatch.</p>
     <div class="chips" id="jeux-menu"></div>
     <div id="jeu"></div>
+  </section>
+
+  <section id="tab-absences" class="tab" hidden>
+    <h2>Qui manque le plus de votes ?</h2>
+    <p class="note">Tous les votes nominaux du Conseil national depuis décembre 2023. <b>Excusé</b> : absence annoncée pour maladie, accident, maternité ou paternité, ou mission officielle (art. 57 al. 4 de la loi sur le Parlement). <b>Non excusé</b> : l'élu n'a pas pris part au vote sans excuse enregistrée. Les données ne disent pas pourquoi : une absence peut avoir une raison légitime. Le Conseil des États ne publie pas ses votes nominaux sous cette forme.</p>
+    <div class="filters" id="f-abs"></div>
+    <p class="summary" id="s-abs"></p>
+    <div class="table-wrap"><table id="t-abs"></table></div>
+  </section>
+
+  <section id="tab-lobbyistes" class="tab" hidden>
+    <h2>Qui fait entrer qui au Palais fédéral ?</h2>
+    <p class="note">Chaque parlementaire peut donner deux badges d'accès permanents au Palais fédéral. Beaucoup vont à des représentants d'intérêts (lobbyistes), qui peuvent alors circuler librement dans les couloirs du Parlement. Source : registre des accès, via Lobbywatch.</p>
+    <div class="kpis" id="k-lob"></div>
+    <div class="filters" id="f-lob"></div>
+    <div id="l-lob"></div>
   </section>
 
   <section id="tab-tendances" class="tab" hidden>

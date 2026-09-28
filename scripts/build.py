@@ -251,6 +251,13 @@ def build_lobbywatch() -> dict:
                 "fonction": z.get("funktion") or z.get("beruf_fr") or z.get("beruf") or "",
                 "mandats": [m for m in mandats if m and m != "?"][:8],
             })
+    # Contexte à afficher à côté de certains chiffres (absences…), édité à la main : config/contexte_elus.csv
+    path = ROOT / "config" / "contexte_elus.csv"
+    if path.exists():
+        ctx = {r["nom"].strip(): r for r in csv.DictReader(path.open(encoding="utf-8"), delimiter=";") if r.get("nom")}
+        for e in elus:
+            if e["nom"] in ctx:
+                e["contexte"] = {"note": ctx[e["nom"]]["contexte"].strip(), "source": (ctx[e["nom"]].get("source") or "").strip()}
     if len(elus) < MIN_ELUS:
         raise RuntimeError(f"seulement {len(elus)} élus : export Lobbywatch incomplet ?")
     return {"elus": elus, "liens": liens, "badges": badges, "orgs": orgs,
@@ -465,7 +472,9 @@ def build_votes(campagnes: list[dict]) -> list[dict]:
 # --------------------------------------------------------------------------
 
 LEGISLATURE = 52  # depuis décembre 2023
-DECISION = {1: "o", 2: "n", 3: "a", 5: "-", 6: "-", 7: "p"}  # oui, non, abstention, absent/excusé, président
+# oui, non, abstention, n'a pas participé, excusé (art. 57 al. 4 LParl : maladie, maternité, mission officielle), président
+DECISION = {1: "o", 2: "n", 3: "a", 5: "-", 6: "e", 7: "p"}
+CACHE_VERSION = 2  # à incrémenter quand le codage des votes change
 SUJETS = {"Schlussabstimmung": "Vote final", "Gesamtabstimmung": "Vote sur l'ensemble", "Eintreten": "Entrée en matière",
           "Rückweisungsantrag": "Proposition de renvoi", "Ausgabenbremse": "Frein aux dépenses"}
 PARL_CACHE = HIST / "parlement_cache.json"
@@ -500,7 +509,9 @@ def odata_date(s: str) -> str:
 
 def fetch_parlement() -> dict:
     """Met à jour le cache des scrutins : seuls les scrutins absents du cache sont téléchargés."""
-    cache = load_json(PARL_CACHE, {"ordre": [], "membres": {}, "scrutins": {}})
+    cache = load_json(PARL_CACHE, {})
+    if cache.get("version") != CACHE_VERSION:  # codage des votes changé : on reconstruit le cache
+        cache = {"version": CACHE_VERSION, "ordre": [], "membres": {}, "scrutins": {}}
     meta = odata("Vote", f"Language eq 'FR' and IdLegislativePeriod eq {LEGISLATURE}",
                  "ID,BusinessShortNumber,BusinessTitle,BillTitle,Subject,MeaningYes,MeaningNo,VoteEnd")
     if len(meta) < 100:
@@ -562,7 +573,8 @@ def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commission
     com_objet = cache.get("commissions", {})
 
     ids = sorted(cache["scrutins"], key=int, reverse=True)
-    scrutins, stats, ecarts = [], defaultdict(lambda: {"vote": 0, "total": 0, "contre": 0, "recents": []}), defaultdict(list)
+    scrutins, ecarts = [], defaultdict(list)
+    stats = defaultdict(lambda: {"vote": 0, "total": 0, "absent": 0, "excuse": 0, "contre": 0, "recents": []})
     testes = defaultdict(int)
     for vid in ids:
         s = cache["scrutins"][vid]
@@ -583,6 +595,10 @@ def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commission
             st["total"] += 1
             if d in "ona":
                 st["vote"] += 1
+            elif d == "-":
+                st["absent"] += 1
+            elif d == "e":
+                st["excuse"] += 1
             g = groupe[pn]
             if d in "on" and gy[g] + gn[g] >= 3 and gy[g] != gn[g]:
                 majorite = "o" if gy[g] > gn[g] else "n"
@@ -620,6 +636,7 @@ def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commission
     top = {g: {"secteur": secteur_de[g], "elus": len(interets[g]), "commissions": commissions[g], "testes": testes[g],
                "scrutins": sorted(ecarts[g], key=lambda x: -abs(x[5]))[:25]} for g in interets if testes[g]}
     elus_stats = {by_pn[pn]["id"]: {"participation": round(100 * st["vote"] / st["total"], 1) if st["total"] else None,
+                                    "scrutins": st["total"], "absences": st["absent"], "excuses": st["excuse"],
                                     "contre_groupe": st["contre"], "recents": st["recents"]}
                   for pn, st in stats.items() if pn in by_pn}
     return {"legislature": LEGISLATURE, "membres": membres, "scrutins": scrutins, "elus": elus_stats, "interets": top,

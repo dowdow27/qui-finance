@@ -11,7 +11,7 @@
   --focus: #F2B705;
   /* groupes parlementaires (couleurs usuelles des partis) */
   --f-G: #6FA83A; --f-S: #D93A3A; --f-GL: #B3AE1F; --f-ME: #EF8C00; --f-RL: #2F6DB3; --f-V: #1F6B35; --f-X: #9AA4AE;
-  --yes: #1F5F8B; --no: #C8202A; --abst: #E0A100; --absent: #C9CEC6;
+  --yes: #1F5F8B; --no: #C8202A; --abst: #E0A100; --absent: #C9CEC6; --excuse: #8C959E;
   --radius-s: 4px;
   --radius-l: 14px;
   color-scheme: light;
@@ -24,14 +24,14 @@
     --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
     --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark;
     --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
-    --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552;
+    --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552; --excuse: #6B7580;
   }
 }
 :root[data-theme="dark"] {
   --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
   --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark;
   --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
-  --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552;
+  --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552; --excuse: #6B7580;
 }
 *, *::before, *::after { box-sizing: inherit; }
 html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 64px); }
@@ -265,6 +265,21 @@ a.chip { text-decoration: none; }
 .kpis.small { gap: 14px; margin: 12px 0 4px; }
 .kpis.small .kpi b { font-size: 1.15rem; }
 @media (max-width: 640px) { .pm { grid-template-columns: 1fr; } }
+
+/* À la une, traductions, listes longues */
+.une { margin: 0 0 20px; }
+.une-card { display: grid; gap: 6px; align-content: start; color: inherit; text-decoration: none; border-top: 4px solid var(--money); }
+.une-card:hover { border-color: var(--ink); }
+.une-card h3 { font-size: 1.2rem; line-height: 1.25; margin: 0; }
+.une-card .big { margin: 2px 0; }
+.eyebrow-s { margin: 0; font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.go { color: var(--infl); font-weight: 700; margin-top: 4px; }
+.podium { margin: 4px 0 0; padding-left: 20px; }
+.podium li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.de-hint { display: block; font-size: .78rem; font-weight: 400; color: var(--muted); font-style: italic; }
+.ctx { display: block; font-size: .78rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+details.more > summary { cursor: pointer; color: var(--infl); font-weight: 500; padding: 8px 0; }
+details.more[open] > summary { color: var(--muted); }
 
 /* Nouveautés */
 .week { border-top: 2px solid var(--ink); padding: 14px 0 24px; }
