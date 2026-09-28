@@ -339,6 +339,9 @@ a.chip { text-decoration: none; }
 .une-card:hover { border-color: var(--ink); }
 .une-card h3 { font-size: 1.2rem; line-height: 1.25; margin: 0; }
 .une-card .big { margin: 2px 0; }
+.coa { display: inline-block; vertical-align: -.2em; margin-right: .3em; object-fit: contain; }
+.summary .coa, .filters .coa { vertical-align: middle; margin-right: .5em; }
+.ct .coa { margin-right: 3px; vertical-align: -2px; }
 .eyebrow-s { margin: 0; font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .go { color: var(--infl); font-weight: 700; margin-top: 4px; }
 .podium { margin: 4px 0 0; padding-left: 20px; }

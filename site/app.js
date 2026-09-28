@@ -29,6 +29,9 @@ async function getJSON(name, fallback) {
 }
 
 const PARTI_F = {};  // parti → groupe parlementaire (couleur)
+/* Armoiries des cantons (site/img/cantons/XX.png, Wikimedia Commons, domaine public) : petites, à côté du nom du canton, jamais comme logo */
+const CANTONS = new Set(["AG", "AI", "AR", "BE", "BL", "BS", "FR", "GE", "GL", "GR", "JU", "LU", "NE", "NW", "OW", "SG", "SH", "SO", "SZ", "TG", "TI", "UR", "VD", "VS", "ZG", "ZH"]);
+const armoiries = (c, w = 18) => (CANTONS.has(c) ? `<img class="coa" src="img/cantons/${c}.png" alt="" width="${w}" height="${Math.round(w * 1.22)}" loading="lazy">` : "");
 function buildIndexes() {
   for (const e of L.elus) { e.liens = []; e.badges = []; e._n = norm(e.nom); idx.elu.set(e.id, e); PARTI_F[e.parti] ||= e.fraction; }
   for (const l of L.liens) {
@@ -172,7 +175,7 @@ function sheetElu(e) {
   const known = sum(paid, (l) => l.montant);
   const sect = {}; e.liens.forEach((l) => { sect[l.secteur] = (sect[l.secteur] || 0) + 1; });
   return `<div class="elu-head">${e.photo ? `<figure class="portrait"><img src="${esc(e.photo)}" alt="${esc(e.nom)}" width="84" height="84" loading="lazy" onerror="this.parentNode.remove()"><figcaption>© ParlCH</figcaption></figure>` : ""}
-  <div><h2>${esc(e.nom)}</h2><p class="note">${esc(e.parti)}, ${esc(e.canton)}, ${esc(e.conseil)}${e.profession ? ". " + esc(e.profession) : ""}${e.commissions ? `. Commissions : ${esc(e.commissions)}` : ""}</p></div></div>
+  <div><h2>${esc(e.nom)}</h2><p class="note">${armoiries(e.canton, 16)}${esc(e.parti)}, ${esc(e.canton)}, ${esc(e.conseil)}${e.profession ? ". " + esc(e.profession) : ""}${e.commissions ? `. Commissions : ${esc(e.commissions)}` : ""}</p></div></div>
   <div class="kpis">${kpi(e.liens.length, "mandats en cours", "infl")}${kpi(paid.length, "rémunérés")}${kpi(known ? chf(known) : "–", "montants communiqués / an")}</div>
   ${API ? `<section id="elu-conf"><h3>Cote de confiance</h3><p class="note">Chargement…</p></section>` : ""}
   <section><h3>Secteurs</h3>${bars(Object.entries(sect).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v })), "i", (v) => v)}</section>
@@ -365,7 +368,7 @@ function sheetVote(v) {
   <div class="kpis">${v.oui != null ? kpi(pct(v.oui), v.type === "Question subsidiaire" ? "pour l'initiative" : "de oui", "infl") + kpi(pct(v.participation), "participation") + kpi(`${num1(ktOui)} / ${num1(ktNon)}`, "cantons oui / non") : ""}
     ${a ? kpi(short(a.pour), "CHF, campagne du oui", "infl") + kpi(short(a.contre), "CHF, campagne du non", "money") : ""}</div>
   ${cs.some(([, c]) => c.oui != null) ? `<section><h3>Résultat par canton</h3><div class="legend wrap-l"><span><i style="background:var(--infl)"></i>majorité ${ouiLbl(v)}</span><span><i style="background:var(--money)"></i>majorité ${v.type === "Question subsidiaire" ? "pour le contre-projet" : "non"}</span><span>plus la couleur est marquée, plus l'écart est net</span></div>
-    <div class="cantons">${cs.map(([k, c]) => `<div class="ct" style="${tileStyle(c.oui)}" title="${k} : ${pct(c.oui)} ${ouiLbl(v)}, participation ${pct(c.participation)}"><b>${k}</b><span>${c.oui != null ? pct(c.oui) : "–"}</span></div>`).join("")}</div></section>` : ""}
+    <div class="cantons">${cs.map(([k, c]) => `<div class="ct" style="${tileStyle(c.oui)}" title="${k} : ${pct(c.oui)} ${ouiLbl(v)}, participation ${pct(c.participation)}"><b>${armoiries(k, 13)}${k}</b><span>${c.oui != null ? pct(c.oui) : "–"}</span></div>`).join("")}</div></section>` : ""}
   <section><h3>Argent de la campagne</h3>${a ? `<div class="legend"><span><i style="background:var(--infl)"></i>oui</span><span><i style="background:var(--money)"></i>non</span></div><p class="note">Recettes déclarées au CDF par les comités de chaque camp${budget ? ". Certains chiffres sont encore des budgets : le décompte final n'est pas publié" : ""}. Un même comité peut déclarer une campagne commune à plusieurs objets du même jour.</p>${camp("Pour", "i")}${camp("Contre", "m")}`
     : `<p class="note">Aucune campagne déclarée au CDF pour cet objet. L'obligation s'applique depuis le 23 octobre 2023, et seulement aux campagnes de plus de 50 000 CHF.</p>`}</section>
   ${v.vote_final ? `<section id="vote-final"><p class="note">Chargement du vote final…</p></section>` : ""}
@@ -873,7 +876,7 @@ async function gameCanton(box, run) {
   store.set("qf-canton", cur);
   const p = await loadParl(); if (stale(run)) return;
   const elus = L.elus.filter((e) => e.canton === cur).sort((a, b) => (a.conseil > b.conseil ? 1 : -1) || a.nom.localeCompare(b.nom));
-  box.innerHTML = `<div class="filters"><select id="mc-canton" aria-label="Canton">${cantons.map((c) => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+  box.innerHTML = `<div class="filters">${armoiries(cur, 34)}<select id="mc-canton" aria-label="Canton">${cantons.map((c) => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
     <div class="elu-cards">${elus.map((e) => { const paid = e.liens.filter((l) => l.statut === "remunere").length, st = p?.elus[e.id];
       return `<div class="card elu-card"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="56" height="56" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.conseil)}</small></span></button>
         <div class="kpis small">${kpi(e.liens.length, "mandats", "infl")}${kpi(paid, "rémunérés", "money")}${st?.participation != null ? kpi(pctInt(st.participation), "présence aux votes") : ""}${st ? (st.compare_parti ? kpi(pct(100 * st.contre_parti / st.compare_parti), "votes contre son parti") : kpi(nf.format(st.contre_groupe), "votes contre son groupe")) : ""}</div>
@@ -983,7 +986,7 @@ function renderLobbyistes() {
     ${topOrgs.length ? `<div class="card"><h3>Les organisations qui ont le plus de badges</h3>${bars(topOrgs.map(([k, v]) => ({ label: k, value: v })), "m", (v) => v)}</div>` : ""}
     <p class="summary">${list.length} badge${list.length > 1 ? "s" : ""}, donnés par ${hotes.size} élu${hotes.size > 1 ? "s" : ""}</p>
     <div class="elu-cards">${[...hotes.values()].sort((a, b) => b.length - a.length || a[0].e.nom.localeCompare(b[0].e.nom)).map((xs) => { const e = xs[0].e;
-      return `<div class="card elu-card"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="56" height="56" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.canton)} · ${esc(e.conseil)}</small></span></button>
+      return `<div class="card elu-card"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="56" height="56" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${armoiries(e.canton, 12)}${esc(e.canton)} · ${esc(e.conseil)}</small></span></button>
         <p class="note">fait entrer au Palais fédéral :</p>
         <ul class="list">${xs.map((x) => `<li><span><strong>${esc(x.b.nom)}</strong></span><span class="tag ${x.type === "Lobbyiste" ? "paid" : ""}">${esc(x.type)}</span>
           <span class="sub">${esc(x.org || trBadge(x.b.fonction))}${x.org ? " " + deHint(x.org) : ""}${x.b.mandats.length && x.b.mandats[0] !== x.org ? ` · aussi : ${esc(x.b.mandats.slice(0, 3).join(", "))}` : ""}</span></li>`).join("")}</ul>
@@ -1105,7 +1108,7 @@ async function renderSpotlight() {
   if (!picks.length) { box.remove(); return; }
   const presseMode = byElu.size > 0;
   const row = ([e, arts], st) => { const paid = e.liens.filter((l) => l.statut === "remunere").length, lp = liensPotentiels().find((x) => x.e === e), a = arts[0];
-    return `<li class="spot-row"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="44" height="44" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.canton)} · ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"}</small></span></button>
+    return `<li class="spot-row"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="44" height="44" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${armoiries(e.canton, 12)}${esc(e.canton)} · ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"}</small></span></button>
       <p class="spot-kpi">${e.liens.length} mandats, <b class="${paid ? "money" : ""}">${paid} rémunérés</b>${st ? `, présence aux votes ${pctInt(st.participation)}` : ""}${lp ? `, ${lp.n} lien${lp.n > 1 ? "s" : ""} d'intérêts potentiel${lp.n > 1 ? "s" : ""}` : ""}.</p>
       ${a ? `<p class="spot-art"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.titre)}</a> <small class="note">${esc(a.source)} · ${esc(dateFr(a.date))}${arts.length > 1 ? ` · et ${arts.length - 1} autre${arts.length > 2 ? "s" : ""} article${arts.length > 2 ? "s" : ""}` : ""}</small></p>` : ""}</li>`; };
   const html = (p) => `<section class="card une-card spot"><p class="eyebrow-s">${presseMode ? "Dans l'actualité" : "L'élu du jour"}</p><ul class="spot-list">${picks.map((x) => row(x, p?.elus[x[0].id])).join("")}</ul>
@@ -1151,7 +1154,7 @@ async function renderConfiance() {
   const total = sum([...CONF.tot.values()], (t) => t.oui + t.non);
   box.innerHTML = `<p class="eyebrow-s">Cote de confiance</p><h2 class="qs-q">Faites-vous confiance à vos élus ?</h2>
     <p class="note">Un vote par personne et par élu, modifiable, résultats publics et visibles sur chaque fiche. ${total ? `${nf.format(total)} vote${total > 1 ? "s" : ""} jusqu'ici.` : "Les premiers votes font le classement."} Un élu entre dans les classements à partir de ${MIN_CONF} votes.</p>
-    <div class="filters conf-filters"><select id="conf-canton" aria-label="Canton"><option value="">Choisissez votre canton…</option>${cantons.map((c) => `<option value="${c}"${c === canton ? " selected" : ""}>${c}</option>`).join("")}</select>${canton ? `<span class="summary">${elus.length} élu${elus.length > 1 ? "s" : ""} fédéraux pour ${esc(canton)}</span>` : ""}</div>
+    <div class="filters conf-filters"><select id="conf-canton" aria-label="Canton"><option value="">Choisissez votre canton…</option>${cantons.map((c) => `<option value="${c}"${c === canton ? " selected" : ""}>${c}</option>`).join("")}</select>${canton ? `<span class="summary">${armoiries(canton, 30)}${elus.length} élu${elus.length > 1 ? "s" : ""} fédéraux pour ${esc(canton)}</span>` : ""}</div>
     ${canton ? `<ul class="conf-list">${elus.map((e) => `<li><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="44" height="44" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"}</small></span></button>${confBlock(e, true)}</li>`).join("")}</ul>` : ""}
     ${rated.length ? `<div class="grid conf-grid"><div><h3>Les mieux notés</h3>${bars(top.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "i", (v) => `${v} %`, 100)}</div>
       <div><h3>Les moins bien notés</h3>${bars(flop.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "m", (v) => `${v} %`, 100)}</div></div>
