@@ -179,19 +179,23 @@ function sheetElu(e) {
   const paid = e.liens.filter((l) => l.statut === "remunere");
   const known = sum(paid, (l) => l.montant);
   const sect = {}; e.liens.forEach((l) => { sect[l.secteur] = (sect[l.secteur] || 0) + 1; });
+  const lp = liensPotentiels().find((x) => x.e === e);
+  const nav = [["#s-mandats", "Mandats"], e.conseil === "CN" ? ["#s-votes", "Votes"] : null, e.badges.length ? ["#s-badges", "Badges"] : null, ["#s-secteurs", "Secteurs"]].filter(Boolean);
   return `<div class="elu-head">${e.photo ? `<figure class="portrait"><img src="${esc(e.photo)}" alt="${esc(e.nom)}" width="84" height="84" loading="lazy" onerror="this.parentNode.remove()"><figcaption>© ParlCH</figcaption></figure>` : ""}
   <div><h2>${esc(e.nom)}</h2><p class="note">${armoiries(e.canton, 16)}${esc(e.parti)}, ${esc(e.canton)}, ${esc(e.conseil)}${e.profession ? ". " + esc(e.profession) : ""}${e.commissions ? `. Commissions : ${esc(e.commissions)}` : ""}</p></div></div>
   <div class="kpis">${kpi(e.liens.length, "mandats en cours", "infl")}${kpi(paid.length, "rémunérés")}${kpi(known ? chf(known) : "–", "montants communiqués / an")}</div>
+  <nav class="sheet-nav" aria-label="Dans cette fiche">${nav.map(([h, l]) => `<a href="${h}">${l}</a>`).join("")}${shareBtn(`fiche-${e.id}`, () => shareCard({ kicker: "Fiche d'élu", title: `${e.nom} (${e.parti}, ${e.canton}, ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"})`, big: `${e.liens.length} mandats`, bigColor: "#1F5F8B", lines: [`dont ${paid.length} rémunérés, selon Lobbywatch.`, ...(lp ? [`${lp.n} lien${lp.n > 1 ? "s" : ""} d'intérêts potentiel${lp.n > 1 ? "s" : ""} : commission et mandat du même secteur.`] : []), "Qui finance qui ? Cherchez votre élu."], text: `${e.nom} : ${e.liens.length} mandats dont ${paid.length} rémunérés.`, file: `elu-${e.id}.png` }), "Partager")}</nav>
   ${API ? `<section id="elu-conf"><h3>Cote de confiance</h3><p class="note">Chargement…</p></section>` : ""}
-  <section><h3>Secteurs</h3>${bars(Object.entries(sect).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v })), "i", (v) => v)}</section>
-  ${(() => { const lp = liensPotentiels().find((x) => x.e === e); return lp ? `<section><h3>Liens d'intérêts potentiels</h3><p class="hint">Commission de l'élu et mandat rémunéré ou badge donné dans le secteur qu'elle examine (correspondance Lobbywatch). Un lien n'est pas une faute.</p><ul class="list">${lp.hits.map((h) => `<li><span>${lpLine(h)}</span></li>`).join("")}</ul></section>` : ""; })()}
-  <section><h3>Mandats</h3>${e.liens.length ? listMore([...e.liens].sort((a, b) => (b.statut === "remunere") - (a.statut === "remunere") || (b.montant || 0) - (a.montant || 0)).map((l) =>
+  ${lp ? `<section><h3>Liens d'intérêts potentiels</h3><p class="hint">Commission de l'élu et mandat rémunéré ou badge donné dans le secteur qu'elle examine (correspondance Lobbywatch). Un lien n'est pas une faute.</p><ul class="list">${lp.hits.map((h) => `<li><span>${lpLine(h)}</span></li>`).join("")}</ul></section>` : ""}
+  <section id="s-mandats"><h3>Mandats</h3>${e.liens.length ? listMore([...e.liens].sort((a, b) => (b.statut === "remunere") - (a.statut === "remunere") || (b.montant || 0) - (a.montant || 0)).map((l) =>
     `<li><span>${linkBtn("org", l.org, l.org)} ${deHint(l.org)}</span><span class="tag ${l.statut === "remunere" ? "paid" : ""}">${l.montant ? chf(l.montant) : STATUT[l.statut]}</span>
      <span class="sub">${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}. ${esc(l.secteur)}${l.principal ? ". Activité principale" : ""}</span></li>`), 8, "mandats") : `<p class="note">Aucun mandat déclaré.</p>`}</section>
-  ${e.conseil === "CN" ? `<section><h3>Votes au Conseil national</h3><div id="elu-votes"><p class="note">Chargement…</p></div></section>` : ""}
-  ${e.badges.length ? `<section><h3>Badges d'accès donnés</h3><ul class="list">${e.badges.map((b) => `<li><span>${esc(b.nom)}</span><span class="tag ${badgeType(b) === "Lobbyiste" ? "paid" : ""}">${esc(badgeType(b))}</span><span class="sub">${esc(trBadge(b.fonction))} ${deHint(b.fonction)}${b.mandats.length ? ". " + esc(b.mandats.join(", ")) : ""}</span></li>`).join("")}</ul></section>` : ""}
-  <p><a href="#reseaux:elu|${e.id}" data-close>Voir son réseau</a> · ${e.parlement ? `<a href="${esc(e.parlement)}" target="_blank" rel="noopener">Fiche officielle sur parlament.ch</a> · ` : ""}<a href="${esc(e.url)}" target="_blank" rel="noopener">Fiche complète sur Lobbywatch</a></p>`;
+  ${e.conseil === "CN" ? `<section id="s-votes"><h3>Votes au Conseil national</h3><div id="elu-votes"><p class="note">Chargement…</p></div></section>` : ""}
+  ${e.badges.length ? `<section id="s-badges"><h3>Badges d'accès donnés</h3><ul class="list">${e.badges.map((b) => `<li><span>${esc(b.nom)}</span><span class="tag ${badgeType(b) === "Lobbyiste" ? "paid" : ""}">${esc(badgeType(b))}</span><span class="sub">${esc(trBadge(b.fonction))} ${deHint(b.fonction)}${b.mandats.length ? ". " + esc(b.mandats.join(", ")) : ""}</span></li>`).join("")}</ul></section>` : ""}
+  <section id="s-secteurs"><h3>Secteurs</h3>${bars(Object.entries(sect).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v })), "i", (v) => v)}</section>
+  <p><a href="#reseaux:elu|${e.id}" data-close>Voir son réseau</a> · ${e.parlement ? `<a href="${esc(e.parlement)}" target="_blank" rel="noopener">Fiche officielle sur parlament.ch</a> · ` : ""}<a href="${esc(e.url)}" target="_blank" rel="noopener">Fiche Lobbywatch</a></p>`;
 }
+
 function sheetOrg(o) {
   if (!o) return "";
   const donor = idx.donorNorm.get(norm(o.nom, true));
@@ -252,7 +256,7 @@ function renderDons() {
   $("#t-dons").innerHTML = `<thead><tr>${th("donateur", "Donateur")}${th("beneficiaire", "Bénéficiaire")}<th class="hide-s">Objet</th>${th("annee", "Année", "num")}${th("montant", "Montant", "num")}</tr></thead>
     <tbody>${page.map((x) => `<tr class="click" data-open="donor" data-key="${esc(x.donateur)}"><td><strong>${esc(x.donateur)}</strong><br><span class="tag">${esc(x.secteur)}</span></td>
     <td>${esc(x.beneficiaire)}${x.parti ? ` <span class="tag">${esc(x.parti)}</span>` : ""}</td>
-    <td class="hide-s">${esc(x.cat)}${x.camp ? ` <span class="tag ${x.camp.toLowerCase()}">${x.camp}</span>` : ""}<br><small>${esc(x.evt)}</small></td>
+    <td class="hide-s">${esc(x.cat)}${x.camp ? ` <span class="tag ${x.camp.toLowerCase()}">${x.camp}</span>` : ""}<br><small>${idx.voteEvt.has(x.evt) ? linkBtn("vote", idx.voteEvt.get(x.evt).id, idx.voteEvt.get(x.evt).titre) : esc(String(x.evt || "").replace(/^\d\d\.\d\d\.\d{4}\s*/, "").slice(0, 80))}</small></td>
     <td class="num">${x.annee ?? "–"}</td><td class="num money"><strong>${chf(x.montant)}</strong></td></tr>`).join("")}</tbody>`;
   pager("#p-dons", rows.length, s, renderDons);
 }
@@ -452,10 +456,10 @@ async function renderParlVotes() {
       <div class="filters">${`<select id="pv-groupe" aria-label="Groupe d'intérêts">${groupes.map(([g, v]) => `<option value="${esc(g)}">${esc(g)} (${v.scrutins.length} écart${v.scrutins.length > 1 ? "s" : ""})</option>`).join("")}</select>`}</div>
       <div id="pv-ecarts"></div></div>
     <div class="card wide"><h3>Tous les scrutins</h3>
-      <div class="filters"><input type="search" id="pv-q" placeholder="Objet, numéro (24.060), mot-clé…" aria-label="Chercher un scrutin"></div>
+      <div class="filters"><input type="search" id="pv-q" placeholder="Objet, numéro (24.060), mot-clé…" aria-label="Chercher un scrutin"><label class="check"><input type="checkbox" id="pv-tous"> Tous les scrutins, articles et propositions compris</label></div>
       <div id="pv-liste"></div></div></div>`;
   $("#pv-groupe").addEventListener("input", renderEcarts);
-  $("#pv-q").addEventListener("input", renderScrutins);
+  $("#pv-q").addEventListener("input", renderScrutins); $("#pv-tous").addEventListener("input", renderScrutins);
   renderEcarts(); renderScrutins();
 }
 function renderEcarts() {
@@ -469,11 +473,12 @@ function renderEcarts() {
     : `<p class="note">Ces élus votent comme leurs groupes parlementaires sur les objets de leur domaine : aucun écart net.</p>`}`;
 }
 function renderScrutins() {
-  const q = norm($("#pv-q").value).split(" ").filter(Boolean);
-  const rows = (q.length ? PARL.scrutins.filter((s) => matchAll(s._n, q)) : PARL.scrutins).slice(0, 40);
+  const q = norm($("#pv-q").value).split(" ").filter(Boolean), tous = $("#pv-tous")?.checked || q.length > 0;
+  const base = tous ? PARL.scrutins : PARL.scrutins.filter((s) => ["Vote final", "Vote sur l'ensemble"].includes(s[5]));
+  const rows = (q.length ? base.filter((s) => matchAll(s._n, q)) : base).slice(0, 40);
   $("#pv-liste").innerHTML = rows.length ? `<ul class="list">${rows.map((s) => { const c = tally(s);
     return `<li><span>${linkBtn("scrutin", s[0], scrutinTitre(s))}</span><span class="nowrap"><b class="infl">${c.o}</b> / <b class="money">${c.n}</b></span>
-    <span class="sub">${esc(dateFr(s[1]))} · ${esc(s[2])}${s[4] ? ` · ${esc(s[4])}` : ""}</span></li>`; }).join("")}</ul>${q.length ? "" : `<p class="note">Les 40 plus récents sur ${nf.format(PARL.scrutins.length)}. Cherchez un objet pour remonter plus loin.</p>`}`
+    <span class="sub">${esc(dateFr(s[1]))} · ${esc(s[2])}${s[4] ? ` · ${esc(s[4])}` : ""}</span></li>`; }).join("")}</ul>${q.length ? "" : `<p class="note">Les 40 plus récents ${tous ? "" : "votes finaux et d'ensemble "}sur ${nf.format(base.length)}. Cherchez un objet pour remonter plus loin.</p>`}`
     : `<p class="empty">Aucun scrutin ne correspond.</p>`;
 }
 
@@ -1191,9 +1196,12 @@ async function renderEngager() {
   const slug = (p) => norm(p).replace(/ /g, "-"), utm = (u) => u + (u.includes("?") ? "&" : "?") + "utm_source=quifinance&utm_medium=engager";
   const lnk = (p, k, label, ghost) => p[k] ? `<a class="btn${ghost ? " ghost" : ""}" href="${esc(utm(p[k]))}" target="_blank" rel="noopener" data-clic="${slug(p.parti)}:${k}">${label}</a>` : "";
   const cpt = (p) => { const a = clics[`${slug(p.parti)}:adherer`] || 0, d = clics[`${slug(p.parti)}:don`] || 0; return a || d ? `Depuis ce site : ${a} clic${a > 1 ? "s" : ""} vers l'adhésion, ${d} vers les dons.` : "Aucun clic depuis ce site pour l'instant."; };
-  box.innerHTML = rows.length ? `<div class="grid">${rows.map((p) => `<div class="card parti-card"><h3>${esc(p.parti)} <small class="note">${sieges[p.parti]} siège${sieges[p.parti] > 1 ? "s" : ""}</small></h3>
+  const grands = rows.filter((p) => sieges[p.parti] >= 5), petits = rows.filter((p) => sieges[p.parti] < 5);
+  const tl = (p, k, label) => p[k] ? `<a href="${esc(utm(p[k]))}" target="_blank" rel="noopener" data-clic="${slug(p.parti)}:${k}">${label}</a>` : "";
+  box.innerHTML = rows.length ? `<div class="grid">${grands.map((p) => `<div class="card parti-card"><h3>${esc(p.parti)} <small class="note">${sieges[p.parti]} sièges</small></h3>
     <div class="answers">${lnk(p, "adherer", "Adhérer")}${lnk(p, "don", "Faire un don")}${lnk(p, "site", "Site officiel", true)}</div>
-    <p class="hint">${cpt(p)}${p.note ? " " + esc(p.note) : ""}</p></div>`).join("")}</div>` : `<p class="empty">Liste des partis indisponible.</p>`;
+    <p class="hint">${cpt(p)}${p.note ? " " + esc(p.note) : ""}</p></div>`).join("")}</div>
+    ${petits.length ? `<div class="card wide"><h3>Partis à moins de cinq sièges</h3><ul class="list">${petits.map((p) => `<li><span><strong>${esc(p.parti)}</strong> <small class="note">${sieges[p.parti]} siège${sieges[p.parti] > 1 ? "s" : ""}</small></span><span class="nowrap">${[tl(p, "adherer", "Adhérer"), tl(p, "don", "Don"), tl(p, "site", "Site")].filter(Boolean).join(" · ")}</span>${p.note ? `<span class="sub">${esc(p.note)}</span>` : ""}</li>`).join("")}</ul></div>` : ""}` : `<p class="empty">Liste des partis indisponible.</p>`;
 }
 
 /* ---------------- À la une (accueil) ---------------- */
@@ -1475,7 +1483,7 @@ function hypoCard(h) {
     <div class="hypo-body"><h3>${esc(h.titre)}</h3>
       <p class="meta">${esc(h.pseudo)}, ${esc(dateShort(h.publie_le))} · <span class="counts">${h.pour} pour, ${h.contre} contre</span> <span class="vmsg" role="status"></span></p>
       <p class="texte">${esc(h.texte)}</p><div class="chips">${refs}</div>
-      <button class="link" data-com="${h.id}">${h.n_com ? `${h.n_com} commentaire${h.n_com > 1 ? "s" : ""}` : "Commenter"}</button><div class="coms" hidden></div>
+      <button class="link" data-com="${h.id}">${h.n_com ? `${h.n_com} réaction${h.n_com > 1 ? "s" : ""} · réagir` : "Réagir en une phrase"}</button><div class="coms" hidden></div>
     </div></article>`;
 }
 async function renderDebats() {
@@ -1569,9 +1577,9 @@ async function toggleComs(btn) {
   box.hidden = false; box.innerHTML = `<p class="note">Chargement…</p>`;
   try {
     const h = await api(`/hypotheses/${id}`);
-    box.innerHTML = `<ul class="list">${h.commentaires.map((c) => `<li><span><strong>${esc(c.pseudo)}</strong> <small class="note">${esc(dateShort(c.publie_le))}</small></span><span></span><span class="sub texte">${esc(c.texte)}</span></li>`).join("")}</ul>
-      <form class="form f-com" data-hid="${id}"><label>Pseudo <input name="pseudo" required minlength="2" maxlength="40" value="${esc(store.get("qf-pseudo") || "")}"></label>
-      <label>Commentaire <textarea name="texte" required minlength="2" maxlength="1000" rows="3"></textarea></label><p class="form-msg" role="status"></p><button class="btn ghost" type="submit">Envoyer pour relecture</button></form>`;
+    box.innerHTML = `<form class="form f-com" data-hid="${id}"><label>Votre réaction <textarea name="texte" required minlength="2" maxlength="1000" rows="2" placeholder="Une phrase suffit. Relue avant publication."></textarea></label>
+      <label>Pseudo <input name="pseudo" required minlength="2" maxlength="40" value="${esc(store.get("qf-pseudo") || "")}"></label><p class="form-msg" role="status"></p><button class="btn ghost" type="submit">Envoyer</button></form>
+      ${h.commentaires.length ? `<ul class="list">${h.commentaires.map((c) => `<li><span><strong>${esc(c.pseudo)}</strong> <small class="note">${esc(dateShort(c.publie_le))}</small></span><span></span><span class="sub texte">${esc(c.texte)}</span></li>`).join("")}</ul>` : ""}`;
   } catch (e) { box.innerHTML = `<p class="note">Commentaires indisponibles : ${esc(e.message)}.</p>`; }
 }
 async function submitCom(form) {
@@ -1687,6 +1695,7 @@ document.addEventListener("click", (ev) => {
   const ar = ev.target.closest("[data-addref]"); if (ar) { const r = refFromKey(ar.dataset.addref); if (r && PROP.length < 6 && !PROP.some((x) => x.type === r.type && x.key === r.key)) PROP.push(r); renderPropRefs(); $("#p-ref-q").value = ""; $("#p-ref-res").innerHTML = ""; $("#p-ref-q").focus(); return; }
   const dr = ev.target.closest("[data-delref]"); if (dr) { PROP.splice(+dr.dataset.delref, 1); renderPropRefs(); return; }
   const s = ev.target.closest("[data-sort]"); if (s) { const [t, k] = s.dataset.sort.split(":"); const st = state[t]; st.dir = st.sort === k ? -st.dir : -1; st.sort = k; st.page = 0; (t === "dons" ? renderDons : renderParl)(); return; }
+  const sn = ev.target.closest(".sheet-nav a"); if (sn) { ev.preventDefault(); $(sn.getAttribute("href"))?.scrollIntoView({ block: "start", behavior: "smooth" }); return; }
   const a = ev.target.closest('a[href^="#"]');  // navigation interne : pushState plutôt que hashchange, pour que la mesure d'audience (Cloudflare) compte chaque onglet
   if (a && !ev.defaultPrevented && !ev.metaKey && !ev.ctrlKey && a.getAttribute("href").length > 1) { ev.preventDefault(); if (a.getAttribute("href") !== location.hash) history.pushState(null, "", a.getAttribute("href")); route(); }
 });

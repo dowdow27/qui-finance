@@ -429,6 +429,10 @@ label.check { display: inline-flex; align-items: center; gap: 6px; font-size: .9
 .kpi b { display: block; font-size: 1.6rem; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; }
 .kpi span { color: var(--muted); font-size: .85rem; }
 .sheet-panel section { margin: 0 0 24px; }
+.sheet-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: -8px 0 20px; padding: 8px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); font-size: .95rem; }
+.sheet-nav a { color: var(--ink); font-weight: 700; text-decoration: none; border-bottom: 2px solid transparent; }
+.sheet-nav a:hover { border-bottom-color: var(--money); }
+.sheet-nav .share { margin: 0 0 0 auto; padding: 5px 12px; font-size: .88rem; }
 .sheet-panel section > h3 { font-size: .74rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); border-top: 1px solid var(--ink); padding-top: 8px; margin: 0 0 10px; }
 .sheet-panel h2 { letter-spacing: -.03em; }
 .fiche-debats .hypo { background: var(--paper); }
