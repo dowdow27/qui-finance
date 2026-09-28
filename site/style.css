@@ -278,6 +278,17 @@ a.chip { text-decoration: none; }
 .podium li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
 .de-hint { display: block; font-size: .78rem; font-weight: 400; color: var(--muted); font-style: italic; }
 .ctx { display: block; font-size: .78rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.abs-bar { display: flex; width: 90px; height: 7px; margin: 5px 0 0 auto; border-radius: 2px; background: var(--paper); overflow: hidden; }
+.abs-bar .ne { background: var(--money); }
+.abs-bar .ex { background: var(--excuse); }
+@media (max-width: 640px) {
+  #t-abs .avatar { display: none; }
+  #t-abs th, #t-abs td { padding: 8px 5px; font-size: .85rem; }
+  #t-abs .abs-bar { width: 56px; }
+  #t-abs .ctx { font-size: .72rem; }
+  #t-abs th { white-space: normal; }
+}
+#t-abs caption { caption-side: bottom; text-align: left; padding: 8px 12px; }
 details.more > summary { cursor: pointer; color: var(--infl); font-weight: 500; padding: 8px 0; }
 details.more[open] > summary { color: var(--muted); }
 

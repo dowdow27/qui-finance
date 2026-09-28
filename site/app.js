@@ -882,23 +882,26 @@ async function renderAbsences() {
   const p = await loadParl();
   if (!p) { $("#s-abs").textContent = "Votes indisponibles pour l'instant."; return; }
   const rows = L.elus.filter((e) => e.conseil === "CN" && p.elus[e.id]).map((e) => { const s = p.elus[e.id];
-    return { e, s, taux: 100 * s.absences / s.scrutins, tauxE: 100 * s.excuses / s.scrutins }; });
+    return { e, s, taux: 100 * s.absences / s.scrutins, tauxE: 100 * s.excuses / s.scrutins, tauxT: 100 - s.participation }; });
   if (!$("#fa-tri")) {
-    $("#f-abs").innerHTML = `<select id="fa-tri" aria-label="Tri"><option value="abs">Absences non excusées</option><option value="pres">Présence la plus basse</option><option value="exc">Absences excusées</option></select>
+    $("#f-abs").innerHTML = `<select id="fa-tri" aria-label="Tri"><option value="abs">Tri : absences non excusées</option><option value="tot">Tri : absences au total</option><option value="exc">Tri : absences excusées</option></select>
       ${select("fa-parti", "Parti", uniq(rows.map((r) => r.e.parti)).sort())}${select("fa-canton", "Canton", uniq(rows.map((r) => r.e.canton)).sort())}
       <input type="search" id="fa-q" placeholder="Nom…" aria-label="Chercher un élu">`;
     $("#f-abs").addEventListener("input", renderAbsences);
   }
   const f = { tri: $("#fa-tri").value, parti: $("#fa-parti").value, canton: $("#fa-canton").value, q: norm($("#fa-q").value) };
   const list = rows.filter((r) => (!f.parti || r.e.parti === f.parti) && (!f.canton || r.e.canton === f.canton) && (!f.q || r.e._n.includes(f.q)))
-    .sort({ abs: (a, b) => b.taux - a.taux, pres: (a, b) => a.s.participation - b.s.participation, exc: (a, b) => b.tauxE - a.tauxE }[f.tri]);
+    .sort({ abs: (a, b) => b.taux - a.taux, tot: (a, b) => b.tauxT - a.tauxT, exc: (a, b) => b.tauxE - a.tauxE }[f.tri]);
   const moy = sum(rows, (r) => r.taux) / rows.length;
-  $("#s-abs").innerHTML = `${list.length} élus · en moyenne, un conseiller national n'a pas pris part à <b>${num1(moy)} %</b> des votes sans être excusé ${shareBtn("absences-top", () => { const t = [...rows].sort((a, b) => b.taux - a.taux).slice(0, 3);
+  const moyE = sum(rows, (r) => r.tauxE) / rows.length;
+  $("#s-abs").innerHTML = `${list.length} élus · en moyenne, un conseiller national manque <b class="money">${num1(moy)} %</b> des votes sans excuse et <b>${num1(moyE)} %</b> avec excuse ${shareBtn("absences-top", () => { const t = [...rows].sort((a, b) => b.taux - a.taux).slice(0, 3);
     return shareCard({ kicker: "Qui manque le plus de votes ?", title: "Conseil national : les absences non excusées les plus fréquentes depuis décembre 2023", big: `${pctInt(t[0].taux)}`, bigColor: "#C8202A", lines: t.map((r, i) => `${i + 1}. ${r.e.nom} (${r.e.parti}, ${r.e.canton}) : ${nf.format(r.s.absences)} votes manqués sur ${nf.format(r.s.scrutins)}`).concat([`Moyenne : ${num1(moy)} %. Les données ne disent pas pourquoi un élu était absent.`]), text: "Qui manque le plus de votes au Conseil national ?", file: "absences.png" }); })}`;
-  box.innerHTML = `<thead><tr><th>Élu</th><th class="hide-s">Parti</th><th class="num">Non excusées</th><th class="num hide-s">Excusées</th><th class="num">Présence</th></tr></thead>
+  box.innerHTML = `<thead><tr><th>Élu</th><th class="num">Non excusées</th><th class="num">Excusées</th><th class="num">Total</th></tr></thead>
     <tbody>${list.map((r) => `<tr class="click" data-open="elu" data-key="${r.e.id}"><td><span class="who">${avatar(r.e)}<span><strong>${esc(r.e.nom)}</strong><br><small>${esc(r.e.parti)}, ${esc(r.e.canton)}</small>${ctxNote(r.e)}</span></span></td>
-      <td class="hide-s">${esc(r.e.parti)}</td><td class="num"><strong class="money">${pct(r.taux)}</strong><br><small>${nf.format(r.s.absences)} votes</small></td>
-      <td class="num hide-s">${nf.format(r.s.excuses)}</td><td class="num">${pct(r.s.participation)}</td></tr>`).join("")}</tbody>`;
+      <td class="num"><strong class="money">${pct(r.taux)}</strong><br><small>${nf.format(r.s.absences)} votes</small></td>
+      <td class="num"><strong>${pct(r.tauxE)}</strong><br><small>${nf.format(r.s.excuses)} votes</small></td>
+      <td class="num"><strong>${pct(r.tauxT)}</strong><span class="abs-bar" title="Non excusées ${pct(r.taux)}, excusées ${pct(r.tauxE)}"><span class="ne" style="width:${Math.min(100, 4 * r.taux)}%"></span><span class="ex" style="width:${Math.min(100 - Math.min(100, 4 * r.taux), 4 * r.tauxE)}%"></span></span></td></tr>`).join("")}</tbody>
+    <caption class="note">Barre : absences non excusées (rouge) et excusées (gris), échelle 0 à 25 %.</caption>`;
 }
 
 /* ---------------- Lobbyistes ---------------- */
