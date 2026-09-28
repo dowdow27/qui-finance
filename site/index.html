@@ -33,6 +33,7 @@
     <section class="card qsem" id="qsem" aria-label="La question de la semaine"><p class="note">Chargement…</p></section>
     <div class="grid home-grid">
       <div id="prochaine"></div>
+      <div id="spot"></div>
       <a class="card une-card promo-card" href="#jouer:match"><p class="eyebrow-s">Jouer</p><h3>Vous votez comme quel élu ?</h3><p class="note">Répondez à 10 vrais votes du Conseil national. Le site vous dit quels élus votent comme vous, et qui les finance.</p><span class="go">Jouer →</span></a>
     </div>
     <h2 class="h-search">Chercher un nom</h2>
@@ -48,7 +49,7 @@
   </section>
 
   <section id="tab-dons" class="tab" hidden>
-    <nav class="subnav" aria-label="Explorer"><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Explorer"><span class="subnav-label">Explorer :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Dons déclarés</h2>
     <p class="note">Dons de plus de 15 000 CHF aux partis et de toute taille aux campagnes de plus de 50 000 CHF. Pour chaque campagne, seul le décompte final est retenu (ou le budget s'il n'est pas encore publié), pour ne pas compter deux fois les mêmes francs.</p>
     <div class="filters" id="f-dons"></div>
@@ -58,7 +59,7 @@
   </section>
 
   <section id="tab-votations" class="tab" hidden>
-    <nav class="subnav" aria-label="Explorer"><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Explorer"><span class="subnav-label">Explorer :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Votations</h2>
     <p class="note">Tous les objets soumis au peuple depuis 2023. Fédéral : résultat par canton, mots d'ordre, vote final du Conseil national et argent déclaré par les comités de chaque camp (obligatoire depuis le 23 octobre 2023, pour les campagnes de plus de 50 000 CHF). Cantonal : résultat par commune.</p>
     <div class="filters"><select id="fv-niveau" aria-label="Niveau"><option value="federal">Votations fédérales</option><option value="cantonal">Votations cantonales</option></select></div>
@@ -69,7 +70,7 @@
   </section>
 
   <section id="tab-parlement" class="tab" hidden>
-    <nav class="subnav" aria-label="Explorer"><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Explorer"><span class="subnav-label">Explorer :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Composition du Parlement</h2>
     <p class="note">Sièges par groupe parlementaire. Les petits partis siègent dans le groupe d'un grand parti (par exemple le MCG et la Lega avec l'UDC). Cliquez un siège pour ouvrir la fiche de l'élu.</p>
     <div class="grid" id="hemis"></div>
@@ -92,7 +93,7 @@
   </section>
 
   <section id="tab-absences" class="tab" hidden>
-    <nav class="subnav" aria-label="Classements"><a href="#tendances">Tous les classements</a><a href="#absences">Absences</a><a href="#lobbyistes">Lobbyistes</a></nav>
+    <nav class="subnav" aria-label="Classements"><span class="subnav-label">Classements :</span><a href="#tendances">Tous les classements</a><a href="#absences">Absences</a><a href="#lobbyistes">Lobbyistes</a></nav>
     <h2>Qui manque le plus de votes ?</h2>
     <p class="note">Tous les votes nominaux du Conseil national depuis décembre 2023. <b>Excusé</b> : absence annoncée pour maladie, accident, maternité ou paternité, ou mission officielle (art. 57 al. 4 de la loi sur le Parlement). <b>Non excusé</b> : l'élu n'a pas pris part au vote sans excuse enregistrée. Les données ne disent pas pourquoi : une absence peut avoir une raison légitime. Le Conseil des États ne publie pas ses votes nominaux sous cette forme.</p>
     <div class="filters" id="f-abs"></div>
@@ -101,7 +102,7 @@
   </section>
 
   <section id="tab-lobbyistes" class="tab" hidden>
-    <nav class="subnav" aria-label="Classements"><a href="#tendances">Tous les classements</a><a href="#absences">Absences</a><a href="#lobbyistes">Lobbyistes</a></nav>
+    <nav class="subnav" aria-label="Classements"><span class="subnav-label">Classements :</span><a href="#tendances">Tous les classements</a><a href="#absences">Absences</a><a href="#lobbyistes">Lobbyistes</a></nav>
     <h2>Qui fait entrer qui au Palais fédéral ?</h2>
     <p class="note">Chaque parlementaire peut donner deux badges d'accès permanents au Palais fédéral. Beaucoup vont à des représentants d'intérêts (lobbyistes), qui peuvent alors circuler librement dans les couloirs du Parlement. Source : registre des accès, via Lobbywatch.</p>
     <div class="kpis" id="k-lob"></div>
@@ -110,7 +111,7 @@
   </section>
 
   <section id="tab-reseaux" class="tab" hidden>
-    <nav class="subnav" aria-label="Explorer"><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Explorer"><span class="subnav-label">Explorer :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Qui est lié à qui ?</h2>
     <p class="note">La carte des liens entre élus et organisations : chaque trait est un mandat déclaré (Lobbywatch), en rouge s'il est rémunéré ; en pointillé, un élu qui donne son badge d'accès au Palais fédéral à un lobbyiste de l'organisation. Les bulles liées se regroupent : les « clans » apparaissent d'eux-mêmes.</p>
     <div class="filters" id="f-net"></div>
@@ -118,7 +119,7 @@
   </section>
 
   <section id="tab-tendances" class="tab" hidden>
-    <nav class="subnav" aria-label="Classements"><a href="#tendances">Tous les classements</a><a href="#absences">Absences</a><a href="#lobbyistes">Lobbyistes</a></nav>
+    <nav class="subnav" aria-label="Classements"><span class="subnav-label">Classements :</span><a href="#tendances">Tous les classements</a><a href="#absences">Absences</a><a href="#lobbyistes">Lobbyistes</a></nav>
     <h2>Classements</h2>
     <p class="note">Les chiffres qui font parler, calculés à partir des registres. Chaque ligne renvoie à sa fiche, avec les précautions de lecture.</p>
     <div class="grid" id="classements"></div>
@@ -148,7 +149,7 @@
   </section>
 
   <section id="tab-nouveautes" class="tab" hidden>
-    <nav class="subnav" aria-label="Explorer"><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Explorer"><span class="subnav-label">Explorer :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Nouveautés</h2>
     <p class="note">Ce qui a changé à chaque mise à jour hebdomadaire : nouveaux dons publiés, nouveaux mandats, mandats terminés.</p>
     <div id="news"></div>

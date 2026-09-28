@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -710,6 +710,80 @@ def build_cantonal() -> list[dict]:
 # --------------------------------------------------------------------------
 
 
+# --------------------------------------------------------------------------
+# Presse : articles récents qui citent un parlementaire (flux RSS publics)
+# --------------------------------------------------------------------------
+
+FEEDS = [
+    ("Google Actualités (fr)", "https://news.google.com/rss/search?q=%22conseil+national%22+OR+%22conseiller+national%22+OR+%22conseill%C3%A8re+nationale%22+OR+%22conseil+des+%C3%89tats%22&hl=fr&gl=CH&ceid=CH:fr"),
+    ("Google News (de)", "https://news.google.com/rss/search?q=Nationalrat+OR+Nationalr%C3%A4tin+OR+St%C3%A4nderat+OR+St%C3%A4nder%C3%A4tin&hl=de&gl=CH&ceid=CH:de"),
+    ("Google Actualités (fr, partis)", "https://news.google.com/rss/search?q=UDC+OR+PLR+OR+%22parti+socialiste%22+OR+%22Le+Centre%22+OR+Verts+OR+%22Vert%27lib%C3%A9raux%22+parlement&hl=fr&gl=CH&ceid=CH:fr"),
+    ("Google News (de, Parteien)", "https://news.google.com/rss/search?q=SVP+OR+FDP+OR+SP+OR+Mitte+OR+Gr%C3%BCne+OR+GLP+Parlament&hl=de&gl=CH&ceid=CH:de"),
+    ("Le Temps", "https://www.letemps.ch/articles.rss"),
+    ("Blick", "https://www.blick.ch/fr/suisse/rss.xml"),
+    ("SRF", "https://www.srf.ch/news/bnf/rss/1646"),
+    ("NZZ", "https://www.nzz.ch/schweiz.rss"),
+    ("Tages-Anzeiger", "https://www.tagesanzeiger.ch/schweiz/rss"),
+    ("Watson", "https://www.watson.ch/api/1.0/rss/index.xml"),
+]
+PRESSE_JOURS = 14
+
+
+def parse_date(s: str | None) -> str | None:
+    if not s:
+        return None
+    from email.utils import parsedate_to_datetime
+    try:
+        return parsedate_to_datetime(s).date().isoformat()
+    except (TypeError, ValueError):
+        pass
+    try:
+        return datetime.fromisoformat(s.strip().replace("Z", "+00:00")).date().isoformat()
+    except ValueError:
+        return None
+
+
+def build_presse(elus: list[dict]) -> list[dict]:
+    """Articles des 14 derniers jours dont le titre ou le résumé cite un élu par son prénom et son nom."""
+    import html as html_mod
+    import xml.etree.ElementTree as ET
+    if not elus:
+        return []
+    pats = []
+    for e in elus:
+        parts = e["nom"].split()
+        if len(parts) < 2:
+            continue
+        prenom, nom = re.escape(parts[0]), re.escape(parts[-1])
+        pats.append((e["id"], re.compile(rf"\b{prenom}(?:\s+\S+)?\s+{nom}\b")))  # « Matthias Jauslin » ou « Matthias Samuel Jauslin »
+    seuil = (NOW - timedelta(days=PRESSE_JOURS)).date().isoformat()
+    out, vus, echecs = [], set(), []
+    for source, url in FEEDS:
+        try:
+            root = ET.fromstring(http_get(url, timeout=30))
+        except Exception as e:  # noqa: BLE001
+            echecs.append(f"{source} : {e}")
+            continue
+        for it in root.iter("item"):
+            titre = html_mod.unescape(it.findtext("title") or "").strip()
+            lien = (it.findtext("link") or "").strip()
+            date = parse_date(it.findtext("pubDate")) or NOW.date().isoformat()
+            if not titre or not lien or date < seuil:
+                continue
+            media = (it.findtext("source") or "").strip() or source
+            titre = re.sub(rf"\s+-\s+{re.escape(media)}$", "", titre)  # Google News ajoute « - média » au titre
+            resume = re.sub(r"<[^>]+>", " ", html_mod.unescape(it.findtext("description") or ""))
+            texte = f"{titre} {resume}"
+            for eid, pat in pats:
+                if pat.search(texte) and (eid, lien) not in vus:
+                    vus.add((eid, lien))
+                    out.append({"elu": eid, "titre": titre[:200], "url": lien, "source": media[:60], "date": date})
+    if echecs and len(echecs) == len(FEEDS):
+        raise RuntimeError("; ".join(echecs)[:300])
+    out.sort(key=lambda a: a["date"], reverse=True)
+    return out[:300]
+
+
 def diff(old: list[dict], new: list[dict], key) -> tuple[list, list]:
     o = {key(x): x for x in old}
     n = {key(x): x for x in new}
@@ -728,7 +802,7 @@ def main() -> int:
     try:
         lw = build_lobbywatch()
         orgs = lw.pop("orgs")
-        commissions = lw.pop("commissions")
+        commissions = lw["commissions"]  # gardé dans lobby.json : le site croise commission de l'élu × secteur du mandat
         lobby = lw
         meta["sources"]["lobbywatch"] = {"statut": "ok", "maj": NOW.isoformat()}
     except Exception as e:  # noqa: BLE001
@@ -768,6 +842,14 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"OFS cantonal : {e}")
         meta["sources"].setdefault("ofs_cantonal", {})["statut"] = f"échec : {e}"[:200]
+
+    presse = load_json(OUT / "presse.json", None)
+    try:
+        presse = build_presse(lobby["elus"] if lobby else [])
+        meta["sources"]["presse"] = {"statut": "ok", "maj": NOW.isoformat()}
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"Presse : {e}")
+        meta["sources"].setdefault("presse", {})["statut"] = f"échec : {e}"[:200]
 
     if lobby is None and money is None:
         print("Aucune source disponible :", *errors, sep="\n", file=sys.stderr)
@@ -818,6 +900,8 @@ def main() -> int:
         dump(OUT / "parlement.json", parl)
     if cantonal is not None:
         dump(OUT / "cantonal.json", cantonal)
+    if presse is not None:
+        dump(OUT / "presse.json", presse)
     meta["genere"] = NOW.isoformat()
     meta["compteurs"] = {k: len(v) for src in (money or {}, lobby or {}) for k, v in src.items()}
     meta["compteurs"]["votations"] = len(votes or [])

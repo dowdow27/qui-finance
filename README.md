@@ -8,19 +8,21 @@ Un site qui réunit, cherche et compare deux registres publics, mis à jour auto
 | Liens d'intérêts des parlementaires | Mandats, rémunérations communiquées, badges d'accès au Palais fédéral | [Lobbywatch.ch](https://lobbywatch.ch/datenexport/) |
 | Votes nominaux du Conseil national (législature en cours) | Vote de chaque élu sur chaque scrutin, commissions qui ont examiné chaque objet | [Services du Parlement](https://ws.parlament.ch/odata.svc) (cache incrémental dans `history/parlement_cache.json`) |
 | Votations cantonales (depuis 2023) | Résultats par canton et par commune | [OFS](https://opendata.swiss/fr/dataset/echtzeitdaten-am-abstimmungstag-zu-kantonalen-abstimmungsvorlagen) |
+| Presse | Articles des 14 derniers jours qui citent un parlementaire par son prénom et son nom | Flux RSS publics : Google Actualités (fr, de), Le Temps, Blick, SRF, NZZ, Tages-Anzeiger, Watson |
 | Votations fédérales (depuis 2023) | Résultats, résultats par canton, mots d'ordre | [Swissvotes](https://swissvotes.ch/page/dataset), complété par l'[OFS](https://opendata.swiss/fr/dataset/echtzeitdaten-am-abstimmungstag-zu-eidgenoessischen-abstimmungsvorlagen) pour les cantons |
 
 ## Ce que fait le site
 
 Cinq entrées : **Chercher** (accueil), **Classements** (avec Absences et Lobbyistes), **Jouer**, **Explorer** (Dons, Votations, Parlement, Réseaux, Nouveautés) et **Débats**.
 
-- **Accueil** : la question de la semaine (un chiffre du site, une question de fond, un sondage oui/non ; le site donne les chiffres, les lecteurs tranchent, puis défendent leur position dans les Débats), la prochaine votation et l'argent déclaré par chaque camp, le jeu « Vous votez comme quel élu ? », puis la recherche.
+- **Accueil** : « Dans l'actualité » (un élu cité par la presse des 14 derniers jours, flux RSS, avec sa fiche à côté ; sinon l'élu du jour tiré au sort), la question de la semaine (un chiffre du site, une question de fond, un sondage oui/non ; le site donne les chiffres, les lecteurs tranchent, puis défendent leur position dans les Débats), la prochaine votation et l'argent déclaré par chaque camp, le jeu « Vous votez comme quel élu ? », puis la recherche.
 - **Chercher** : une seule barre pour les donateurs, bénéficiaires, élus, organisations et titulaires de badges. Chaque résultat ouvre une fiche, avec les liens croisés (une entreprise qui donne de l'argent ET qui a des élus dans ses conseils).
 - **Dons** : tableau filtrable par type (élection, votation, parti), parti, secteur, année, camp (pour ou contre), montant. Export CSV.
 - **Votations** : chaque objet fédéral depuis 2023, avec son résultat, la carte des cantons, les mots d'ordre, et l'argent du oui et du non (donateurs compris) quand les comités l'ont déclaré au CDF.
 - **Parlement** : composition du Conseil national et du Conseil des États (hémicycles cliquables) ; votes nominaux du Conseil national (qui a voté quoi, par groupe) ; « les élus liés à un groupe d'intérêts votent-ils comme leur parti ? » ; puis vue par élu ou par mandat, filtres par parti, conseil, secteur, rémunération. Export CSV.
 - **Tendances** : plus gros donateurs, argent par secteur, argent reçu par parti, budget du oui contre budget du non pour chaque votation, secteurs les plus présents au Parlement, mandats rémunérés par parti, évolution semaine après semaine.
 - **Jouer** : « Vote comme un élu » (10 vrais votes du Conseil national, puis les élus et partis les plus proches), quiz de la semaine (renouvelé à chaque mise à jour), « Plus ou moins ? », « Mes élus » par canton. Chaque résultat se partage en image 1080 × 1350 (réseaux sociaux).
+- **Liens d'intérêts potentiels** : les élus qui siègent dans une commission et sont rémunérés par une organisation du secteur qu'elle examine, ou y font entrer un lobbyiste (correspondance secteur → commission de Lobbywatch). Sur l'accueil, dans Lobbyistes, dans chaque fiche d'élu et en classement par parti. Un lien n'est pas une faute : c'est une information.
 - **Classements** : quel parti reçoit le plus (par siège), l'argent gagne-t-il les votations, combien coûte une voix, donateurs de plusieurs partis, cumul de mandats rémunérés, nouveaux mandats depuis l'élection, qui fait entrer quels lobbyistes, frondeurs et absents au Conseil national. Chaque classement commence par la comparaison **par parti** (moyenne par élu), puis par élu, et a sa propre adresse (`#tendances:cumul`), reprise dans le texte partagé avec l'image.
 - **Nouveautés** : ce qui a changé depuis la dernière mise à jour (nouveaux dons, nouveaux mandats, mandats terminés).
 

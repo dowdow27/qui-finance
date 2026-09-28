@@ -174,6 +174,7 @@ function sheetElu(e) {
   <div><h2>${esc(e.nom)}</h2><p class="note">${esc(e.parti)}, ${esc(e.canton)}, ${esc(e.conseil)}${e.profession ? ". " + esc(e.profession) : ""}${e.commissions ? `. Commissions : ${esc(e.commissions)}` : ""}</p></div></div>
   <div class="kpis">${kpi(e.liens.length, "mandats en cours", "infl")}${kpi(paid.length, "rémunérés")}${kpi(known ? chf(known) : "–", "montants communiqués / an")}</div>
   <section><h3>Secteurs</h3>${bars(Object.entries(sect).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v })), "i", (v) => v)}</section>
+  ${(() => { const lp = liensPotentiels().find((x) => x.e === e); return lp ? `<section><h3>Liens d'intérêts potentiels</h3><p class="hint">Commission de l'élu et mandat rémunéré ou badge donné dans le secteur qu'elle examine (correspondance Lobbywatch). Un lien n'est pas une faute.</p><ul class="list">${lp.hits.map((h) => `<li><span>${lpLine(h)}</span></li>`).join("")}</ul></section>` : ""; })()}
   <section><h3>Mandats</h3>${e.liens.length ? listMore([...e.liens].sort((a, b) => (b.statut === "remunere") - (a.statut === "remunere") || (b.montant || 0) - (a.montant || 0)).map((l) =>
     `<li><span>${linkBtn("org", l.org, l.org)} ${deHint(l.org)}</span><span class="tag ${l.statut === "remunere" ? "paid" : ""}">${l.montant ? chf(l.montant) : STATUT[l.statut]}</span>
      <span class="sub">${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}. ${esc(l.secteur)}${l.principal ? ". Activité principale" : ""}</span></li>`), 8, "mandats") : `<p class="note">Aucun mandat déclaré.</p>`}</section>
@@ -617,7 +618,7 @@ const orgBadge = (b) => (b.fonction.split(":").slice(1).join(":").trim() || b.ma
 const LEG_DEBUT = "2023-12-04";
 
 const CL = { partis: "Quel parti reçoit le plus ?", "argent-gagne": "L'argent gagne-t-il ?", "cout-voix": "Combien coûte une voix ?", "multi-partis": "Ils financent plusieurs partis",
-  cumul: "Cumul de mandats rémunérés", nouveaux: "Nouveaux mandats depuis l'élection", badges: "Qui fait entrer qui au Palais fédéral", frondeurs: "Qui vote le plus souvent contre son parti ?", absents: "Qui manque le plus de votes ?" };
+  cumul: "Cumul de mandats rémunérés", nouveaux: "Nouveaux mandats depuis l'élection", badges: "Qui fait entrer qui au Palais fédéral", liens: "Commission et mandat rémunéré du même secteur", frondeurs: "Qui vote le plus souvent contre son parti ?", absents: "Qui manque le plus de votes ?" };
 const clLink = (id) => `${SITE_URL}#tendances:${id}`;
 /* Par parti avant par élu : moyenne par élu, partis d'au moins 3 élus concernés, couleur du groupe parlementaire */
 function parParti(rows, val, min = 3) {
@@ -683,6 +684,13 @@ function renderClassements() {
     partiBars(parParti(L.elus.map((e) => ({ e })), (r) => (hotes[r.e.id] ? 100 : 0)), pctInt, "Par parti, part des élus qui font entrer au moins un lobbyiste")
     + `<ul class="list">${topH.map(([p, bs]) => { const e = idx.elu.get(+p); return e ? `<li><span>${linkBtn("elu", e.id, e.nom)} <small class="note">${esc(e.parti)}</small></span><span class="tag">${bs.length} lobbyiste${bs.length > 1 ? "s" : ""}</span>
       <span class="sub">${bs.map((b) => `${esc(b.nom)} (${esc(orgBadge(b))})`).join(" · ")}</span></li>` : ""; }).join("")}</ul><p><a class="btn ghost" href="#lobbyistes">Tous les badges</a></p>`, true, "badges"));
+  // Liens d'intérêts potentiels : commission × mandat rémunéré ou badge du même secteur
+  const lp = liensPotentiels(), lpSet = new Set(lp.map((r) => r.e.id));
+  const comElus = L.elus.filter((e) => (e.commissions || "").split(",").some((c) => COM_LBL[c.trim().split("-")[0]]));
+  if (lp.length) cards.push(card(CL.liens, "Élus qui siègent dans une commission et sont rémunérés par une organisation du secteur qu'elle examine, ou y font entrer un lobbyiste. Correspondance secteur → commission selon Lobbywatch. Un lien n'est pas une faute.",
+    partiBars(parParti(comElus.map((e) => ({ e })), (r) => (lpSet.has(r.e.id) ? 100 : 0)), pctInt, "Par parti, part des élus concernés parmi ceux qui siègent dans une commission")
+    + lpList(lp, 10)
+    + shareBtn("liens", () => shareCard({ kicker: "Liens d'intérêts potentiels", title: `${lp.length} élus siègent dans une commission et sont rémunérés par une organisation du secteur qu'elle examine, ou y font entrer un lobbyiste`, big: `${lp.length} élus`, lines: lp.slice(0, 3).map((r) => `${r.e.nom} (${r.e.parti}) : ${lpLine(r.hits[0]).replace(/<[^>]+>/g, "")}`).concat(["Un lien n'est pas une faute : c'est une information."]), text: `${lp.length} parlementaires cumulent une commission et un mandat rémunéré du même secteur.`, file: "liens-potentiels.png", link: clLink("liens") })), true, "liens"));
   // Frondeurs et absents (votes nominaux, chargés à la demande)
   cards.push(`<div class="card" id="cl-frondeurs"><h3>${esc(CL.frondeurs)}</h3><p class="note">Chargement des votes…</p></div>`);
   cards.push(`<div class="card" id="cl-absents"><h3>${esc(CL.absents)}</h3><p class="note">Chargement des votes…</p></div>`);
@@ -966,7 +974,9 @@ function renderLobbyistes() {
   const hotes = new Map(); list.forEach((x) => { if (!hotes.has(x.e.id)) hotes.set(x.e.id, []); hotes.get(x.e.id).push(x); });
   const orgs = {}; list.filter((x) => x.org).forEach((x) => { orgs[x.org] = (orgs[x.org] || 0) + 1; });
   const topOrgs = Object.entries(orgs).sort((a, b) => b[1] - a[1]).filter(([, n]) => n > 1).slice(0, 10);
-  box.innerHTML = `${topOrgs.length ? `<div class="card"><h3>Les organisations qui ont le plus de badges</h3>${bars(topOrgs.map(([k, v]) => ({ label: k, value: v })), "m", (v) => v)}</div>` : ""}
+  const lp = liensPotentiels().filter((r) => (!f.parti || r.e.parti === f.parti) && (!f.canton || r.e.canton === f.canton));
+  box.innerHTML = `${lp.length ? `<div class="card"><h3>Liens d'intérêts potentiels : ${lp.length} élu${lp.length > 1 ? "s" : ""}</h3><p class="hint">Un élu qui siège dans une commission et qui est rémunéré par une organisation du secteur qu'elle examine, ou qui y fait entrer un lobbyiste. Correspondance secteur → commission selon Lobbywatch. Un lien n'est pas une faute : c'est une information.</p>${lpList(lp, 8)}<p><a class="btn ghost" href="#tendances:liens">Par parti</a></p></div>` : ""}
+    ${topOrgs.length ? `<div class="card"><h3>Les organisations qui ont le plus de badges</h3>${bars(topOrgs.map(([k, v]) => ({ label: k, value: v })), "m", (v) => v)}</div>` : ""}
     <p class="summary">${list.length} badge${list.length > 1 ? "s" : ""}, donnés par ${hotes.size} élu${hotes.size > 1 ? "s" : ""}</p>
     <div class="elu-cards">${[...hotes.values()].sort((a, b) => b.length - a.length || a[0].e.nom.localeCompare(b[0].e.nom)).map((xs) => { const e = xs[0].e;
       return `<div class="card elu-card"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="56" height="56" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.canton)} · ${esc(e.conseil)}</small></span></button>
@@ -1049,15 +1059,65 @@ function renderProchaine() {
     <a class="go" href="#votations">Toutes les votations →</a></section>`;
 }
 
+/* ---------------- Liens d'intérêts potentiels ---------------- */
+/* Commission de l'élu × secteur de son mandat rémunéré ou du lobbyiste qu'il fait entrer. La correspondance groupe d'intérêts → commission vient de Lobbywatch. Un lien n'est pas une faute. */
+const COM_LBL = { WAK: "économie et redevances", SGK: "santé et sécurité sociale", KVF: "transports et télécommunications", UREK: "environnement, aménagement, énergie", SPK: "institutions politiques", SiK: "sécurité", APK: "politique extérieure", WBK: "science, éducation, culture", RK: "affaires juridiques", FK: "finances" };
+const comLbl = (c) => `commission ${COM_LBL[c] ? `« ${COM_LBL[c]} » (${c})` : c}`;
+let LP = null;
+function liensPotentiels() {
+  if (LP) return LP;
+  const COM = L.commissions || {}, out = [];
+  for (const e of L.elus) {
+    const coms = new Set((e.commissions || "").split(",").map((c) => c.trim().split("-")[0]).filter((c) => COM_LBL[c]));
+    if (!coms.size) continue;
+    const hits = [];
+    for (const l of e.liens) { if (l.statut !== "remunere") continue; const c = (COM[l.groupe] || []).find((x) => coms.has(x)); if (c) hits.push({ type: "mandat", org: l.org, groupe: l.groupe, com: c, montant: l.montant }); }
+    for (const b of e.badges) { if (!isLobbyiste(b)) continue; const name = orgBadge(b), o = idx.org.get(name) || idx.orgNorm.get(norm(name, true)); const c = o ? (COM[o.groupe] || []).find((x) => coms.has(x)) : null; if (c) hits.push({ type: "badge", org: name, nom: b.nom, groupe: o.groupe, com: c }); }
+    if (hits.length) out.push({ e, hits, n: hits.length });
+  }
+  return (LP = out.sort((a, b) => b.n - a.n || b.e.liens.length - a.e.liens.length));
+}
+const lpLine = (h) => h.type === "mandat" ? `${comLbl(h.com)} et mandat rémunéré chez ${esc(h.org)}${h.montant ? ` (${chf(h.montant)})` : ""}` : `${comLbl(h.com)} et badge donné à ${esc(h.nom)} (${esc(h.org)})`;
+function lpList(rows, n = 10) {
+  return listMore(rows.map((r) => `<li><span>${linkBtn("elu", r.e.id, r.e.nom)} <small class="note">${esc(r.e.parti)}, ${esc(r.e.canton)}</small></span><span class="tag ${r.n > 1 ? "paid" : ""}">${r.n} lien${r.n > 1 ? "s" : ""}</span>
+    <span class="sub">${r.hits.slice(0, 3).map(lpLine).join(" · ")}${r.hits.length > 3 ? ` · et ${r.hits.length - 3} autres` : ""}</span></li>`), n, "élus");
+}
+
+/* ---------------- Spotlight : dans l'actualité, ou l'élu du jour ---------------- */
+async function renderSpotlight() {
+  const box = $("#spot"); if (!box) return;
+  const presse = await getJSON("presse", []);
+  const byElu = new Map();
+  for (const a of presse) { const e = idx.elu.get(a.elu); if (e) { if (!byElu.has(e)) byElu.set(e, []); byElu.get(e).push(a); } }
+  const seed = Math.floor(Date.parse((M.genere || new Date().toISOString()).slice(0, 10)) / 864e5);
+  let e, arts = [];
+  if (byElu.size) { const c = [...byElu.entries()].sort((a, b) => b[1][0].date.localeCompare(a[1][0].date) || b[1].length - a[1].length); [e, arts] = c[seed % Math.min(c.length, 5)]; }
+  else if (L.elus.length) e = L.elus[seed % L.elus.length];
+  if (!e) { box.remove(); return; }
+  const paid = e.liens.filter((l) => l.statut === "remunere").length, lp = liensPotentiels().find((x) => x.e === e);
+  const head = (st) => `<section class="card une-card spot"><p class="eyebrow-s">${arts.length ? "Dans l'actualité" : "L'élu du jour"}</p>
+    <button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="56" height="56" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.canton)} · ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"}</small></span></button>
+    <div class="kpis small">${kpi(e.liens.length, "mandats")}${kpi(paid, "rémunérés", paid ? "money" : "")}${st ? kpi(pctInt(st.participation), "présence aux votes") : ""}${e.badges.length ? kpi(e.badges.length, "badges donnés") : ""}</div>
+    ${lp ? `<p class="note">${lp.n} lien${lp.n > 1 ? "s" : ""} d'intérêts potentiel${lp.n > 1 ? "s" : ""} : ${lpLine(lp.hits[0])}.</p>` : ""}
+    ${arts.length ? `<ul class="list presse">${arts.slice(0, 3).map((a) => `<li><span><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.titre)}</a></span><span class="sub">${esc(a.source)} · ${esc(dateFr(a.date))}</span></li>`).join("")}</ul><p class="note">Articles des 14 derniers jours qui citent cet élu (flux RSS). Le site ne commente pas la presse : il met la fiche à côté.</p>`
+      : `<p class="note">Chaque jour, un élu tiré au sort parmi les ${L.elus.length}. Quand la presse cite un parlementaire, il prend la place.</p>`}
+    <span class="go">${linkBtn("elu", e.id, "Voir la fiche →")}</span></section>`;
+  box.outerHTML = head(null); 
+  const p = await loadParl(); const st = p?.elus[e.id]; if (st) $(".spot")?.replaceWith(Object.assign(document.createElement("div"), { innerHTML: head(st) }).firstElementChild);
+}
+
 /* ---------------- À la une (accueil) ---------------- */
 async function renderUne() {
   const box = $("#une"); if (!box) return;
   const lob = L.badges.filter(isLobbyiste), hosts = {}; lob.forEach((b) => { hosts[b.p] = (hosts[b.p] || 0) + 1; });
   const topH = Object.entries(hosts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p]) => idx.elu.get(+p)).filter(Boolean);
-  const ag = argentGagne();
+  const ag = argentGagne(), lp = liensPotentiels();
   const cardA = (id, body) => `<a class="card une-card" href="#${id}">${body}</a>`;
   const html = (abs) => cardA("absences", `<p class="eyebrow-s">Absences</p><h3>Qui manque le plus de votes au Parlement ?</h3>${abs}<span class="go">Voir le classement →</span>`)
-    + cardA("lobbyistes", `<p class="eyebrow-s">Lobbyistes</p><h3>${lob.length} lobbyistes entrent au Palais fédéral grâce au badge d'un élu</h3><p class="note">Parmi ceux qui en font entrer : ${topH.map((e) => esc(e.nom)).join(", ")}…</p><span class="go">Qui fait entrer qui →</span>`)
+    + cardA("lobbyistes", `<p class="eyebrow-s">Lobbyistes et liens d'intérêts</p><h3>${lob.length} lobbyistes entrent au Palais fédéral grâce au badge d'un élu</h3>
+      ${lp.length ? `<p class="big money">${lp.length} élus</p><p class="note">siègent dans une commission et sont rémunérés par une organisation du secteur qu'elle examine, ou y font entrer un lobbyiste. Un lien n'est pas une faute : c'est une information.</p>
+      <ol class="podium">${lp.slice(0, 3).map((r) => `<li><span>${esc(r.e.nom)} <small>(${esc(r.e.parti)})</small><span class="ctx">${lpLine(r.hits[0])}</span></span><b class="money">${r.n}</b></li>`).join("")}</ol>` : `<p class="note">Parmi ceux qui en font entrer : ${topH.map((e) => esc(e.nom)).join(", ")}…</p>`}
+      <span class="go">Qui fait entrer qui →</span>`)
     + (ag.rows.length ? cardA("tendances", `<p class="eyebrow-s">Votations</p><h3>L'argent gagne-t-il ?</h3><p class="big money">${ag.n} sur ${ag.rows.length}</p><p class="note">votations gagnées par le camp qui a dépensé le plus</p><span class="go">Tous les classements →</span>`) : "");
   box.innerHTML = html(`<p class="note">Chargement…</p>`);
   const p = await loadParl(); if (!p) return;
@@ -1552,7 +1612,7 @@ document.addEventListener("input", (ev) => {
 
 (async function init() {
   [M, A, L, C, T, V] = await Promise.all([getJSON("meta", {}), getJSON("argent", { dons: [], campagnes: [] }), getJSON("lobby", { elus: [], liens: [], badges: [] }), getJSON("changes", []), getJSON("timeline", []), getJSON("votations", [])]);
-  buildIndexes(); status(); suggestions(); renderQuestion(); renderProchaine(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
+  buildIndexes(); status(); suggestions(); renderQuestion(); renderProchaine(); renderSpotlight(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
   if (!C.length) document.querySelectorAll('a[href="#nouveautes"]').forEach((a) => (a.hidden = true));  // rien à montrer avant la 2e mise à jour
   else { const w = C[0], n = (w.dons_nouveaux || []).length, m = (w.mandats_nouveaux || []).length; const nl = $("#news-line"); nl.hidden = false; nl.innerHTML = `Cette semaine : ${n} nouveau${n > 1 ? "x" : ""} don${n > 1 ? "s" : ""}, ${m} nouveau${m > 1 ? "x" : ""} mandat${m > 1 ? "s" : ""}. <a href="#nouveautes">Voir les nouveautés →</a>`; }
   $("#fdb-tri").addEventListener("input", renderDebats);

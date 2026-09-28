@@ -58,10 +58,15 @@ a { color: var(--infl); }
 .tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .tabs a { padding: 8px 12px; border-radius: 999px; color: var(--muted); text-decoration: none; white-space: nowrap; font-weight: 500; }
 .tabs a[aria-current="page"] { background: var(--ink); color: var(--paper); }
-.subnav { display: flex; flex-wrap: wrap; gap: 6px; margin: 28px 0 -22px; }
-.subnav a { font-size: .9rem; font-weight: 500; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--card); color: var(--muted); text-decoration: none; }
-.subnav a:hover { border-color: var(--ink); color: var(--ink); }
-.subnav a.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.subnav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 24px 0 -18px; padding: 10px 12px; border-radius: var(--radius-l); background: var(--infl-soft); border-left: 5px solid var(--infl); }
+.subnav-label { font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--infl); margin-right: 4px; }
+.subnav a { font-size: .95rem; font-weight: 700; padding: 7px 16px; border-radius: 999px; border: 2px solid var(--infl); background: var(--card); color: var(--infl); text-decoration: none; }
+.subnav a:hover { background: var(--infl); color: var(--card); }
+.subnav a.on { background: var(--infl); color: var(--card); }
+/* Filtres : un choix visible, pas un détail */
+#tab-dons .filters, #tab-votations .filters, #tab-parlement .filters, #tab-reseaux .filters, #tab-absences .filters, #tab-lobbyistes .filters, #tab-tendances .filters { align-items: center; padding: 10px 12px; border-radius: var(--radius-s); background: var(--card); border: 1px dashed var(--infl); }
+#tab-dons .filters::before, #tab-votations .filters::before, #tab-parlement .filters::before, #tab-reseaux .filters::before, #tab-absences .filters::before, #tab-lobbyistes .filters::before, #tab-tendances .filters::before { content: "Filtrer"; font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--infl); }
+#tab-dons .filters select, #tab-votations .filters select, #tab-parlement .filters select, #tab-reseaux .filters select, #tab-absences .filters select, #tab-lobbyistes .filters select, #tab-tendances .filters select { border: 2px solid var(--infl); font-weight: 500; }
 
 /* Accueil */
 .eyebrow { margin: 48px 0 0; font-size: .82rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
@@ -87,6 +92,11 @@ a { color: var(--infl); }
 .prochaine { border-top-color: var(--infl); }
 .prochaine .list li { padding: 7px 0; }
 .promo-card { border-top-color: var(--infl); }
+.home-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.spot { border-top-color: var(--ink); }
+.spot .elu-card-head { margin: 2px 0 6px; }
+.spot .kpis.small { margin: 4px 0 8px; }
+.presse li a { font-weight: 500; }
 .search-big input {
   width: 100%; font: inherit; font-size: clamp(1.2rem, 3.5vw, 1.6rem); font-weight: 500;
   padding: 18px 20px; border: 2px solid var(--ink); border-radius: var(--radius-l);
