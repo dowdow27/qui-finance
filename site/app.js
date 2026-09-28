@@ -1174,7 +1174,7 @@ const confPct = (t) => (t.oui + t.non ? Math.round(100 * t.oui / (t.oui + t.non)
 function confBlock(e, compact) {
   const t = confOf(e.id), n = t.oui + t.non, mine = CONF.mes[e.id], po = confPct(t);
   return `<div class="conf-block" data-conf="${e.id}"${compact ? ' data-compact=""' : ""}>${compact ? "" : `<p class="conf-q">Faites-vous confiance à ${esc(e.nom)} ? <small class="note">Un vote par personne, modifiable, résultat public.</small></p>`}
-    <div class="conf-row"><button class="btn yes small" data-cvote="1" aria-pressed="${mine === 1}" aria-label="Oui, je fais confiance à ${esc(e.nom)}">Oui</button><button class="btn no small" data-cvote="-1" aria-pressed="${mine === -1}" aria-label="Non, je ne fais pas confiance à ${esc(e.nom)}">Non</button>
+    <div class="conf-row">${compact ? `<span class="conf-lbl">Vous lui faites confiance ?</span>` : ""}<button class="btn yes small" data-cvote="1" aria-pressed="${mine === 1}" aria-label="Oui, je fais confiance à ${esc(e.nom)}">Oui</button><button class="btn no small" data-cvote="-1" aria-pressed="${mine === -1}" aria-label="Non, je ne fais pas confiance à ${esc(e.nom)}">Non</button>
     <span class="conf-res">${n ? `<span class="conf-bar" role="img" aria-label="${po} % de oui"><span style="width:${po}%"></span></span><b class="${po >= 50 ? "infl" : "money"}">${po} %</b> de oui · ${n} vote${n > 1 ? "s" : ""}` : "Personne n'a encore voté."}</span><span class="vmsg" role="status"></span></div></div>`;
 }
 async function voteConf(btn) {

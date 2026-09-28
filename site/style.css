@@ -122,6 +122,7 @@ a { color: var(--infl); }
 .btn.small { padding: 5px 14px; font-size: .9rem; }
 .conf-block .btn[aria-pressed="true"] { outline: 3px solid var(--focus); outline-offset: 2px; }
 .conf-q { margin: 0 0 8px; font-weight: 700; }
+.conf-lbl { font-weight: 700; font-size: .92rem; margin-right: 2px; }
 .conf-q small { font-weight: 400; }
 .conf-res { font-size: .9rem; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
 .conf-bar { display: inline-flex; width: 80px; height: 10px; border-radius: 3px; overflow: hidden; background: var(--money-soft); }
