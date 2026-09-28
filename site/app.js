@@ -59,6 +59,7 @@ function route() {
   if (t === "chercher" && q != null && $("#q").value !== q) { $("#q").value = q; search(); }
   if (t === "tendances") renderTrends();
   if (t === "debats") renderDebats();
+  if (t === "parlement") renderParlVotes();
 }
 
 /* ---------------- Recherche globale ---------------- */
@@ -110,8 +111,17 @@ function openSheet(type, key) {
   if (type === "elu") html = sheetElu(idx.elu.get(Number(key)));
   if (type === "org") html = sheetOrg(idx.org.get(key));
   if (type === "vote") html = sheetVote(idx.vote.get(key));
+  if (type === "scrutin") html = PARL ? sheetScrutin(key) : "";
+  if (type === "cantonal") html = CANT ? sheetCantonal(key) : "";
+  if (!html && ((type === "scrutin" && !PARL) || (type === "cantonal" && !CANT))) {  // données chargées à la demande
+    body.innerHTML = `<p class="note">Chargement…</p>`; $("#sheet").hidden = false;
+    (type === "scrutin" ? loadParl() : loadCant()).then(() => openSheet(type, key));
+    return;
+  }
   if (!html) return;
-  body.innerHTML = html; ficheDebats(type, key); $("#sheet").hidden = false; $(".sheet-panel").scrollTop = 0; $(".close").focus();
+  body.innerHTML = html; ficheDebats(type, key);
+  if (type === "elu") fillEluVotes(idx.elu.get(Number(key)));
+  if (type === "vote") fillVoteFinal(idx.vote.get(key)); $("#sheet").hidden = false; $(".sheet-panel").scrollTop = 0; $(".close").focus();
 }
 const closeSheet = () => { $("#sheet").hidden = true; };
 const kpi = (v, l, cls = "") => `<div class="kpi"><b class="${cls}">${esc(v)}</b><span>${esc(l)}</span></div>`;
@@ -155,6 +165,7 @@ function sheetElu(e) {
   <section><h3>Mandats</h3><ul class="list">${[...e.liens].sort((a, b) => (b.statut === "remunere") - (a.statut === "remunere") || (b.montant || 0) - (a.montant || 0)).map((l) =>
     `<li><span>${linkBtn("org", l.org, l.org)}</span><span class="tag ${l.statut === "remunere" ? "paid" : ""}">${l.montant ? chf(l.montant) : STATUT[l.statut]}</span>
      <span class="sub">${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}. ${esc(l.secteur)}${l.principal ? ". Activité principale" : ""}</span></li>`).join("") || "<li>Aucun mandat déclaré.</li>"}</ul></section>
+  ${e.conseil === "CN" ? `<section><h3>Votes au Conseil national</h3><div id="elu-votes"><p class="note">Chargement…</p></div></section>` : ""}
   ${e.badges.length ? `<section><h3>Badges d'accès donnés</h3><ul class="list">${e.badges.map((b) => `<li><span>${esc(b.nom)}</span><span></span><span class="sub">${esc(b.fonction)}${b.mandats.length ? ". " + esc(b.mandats.join(", ")) : ""}</span></li>`).join("")}</ul></section>` : ""}
   <p>${e.parlement ? `<a href="${esc(e.parlement)}" target="_blank" rel="noopener">Fiche officielle sur parlament.ch</a> · ` : ""}<a href="${esc(e.url)}" target="_blank" rel="noopener">Fiche complète sur Lobbywatch</a></p>`;
 }
@@ -296,6 +307,7 @@ function setupVotes() {
   renderVotes();
 }
 function renderVotes() {
+  if ($("#fv-niveau")?.value === "cantonal") { renderCantonal(); return; }
   const q = norm($("#fv-q").value).split(" ").filter(Boolean);
   const f = { an: $("#fv-an").value, type: $("#fv-type").value, st: $("#fv-statut").value };
   const rows = V.filter((v) => (!f.an || v.date.startsWith(f.an)) && (!f.type || v.type === f.type) && (!f.st || v.statut === f.st) && (!q.length || matchAll(v._n, q)));
@@ -340,6 +352,7 @@ function sheetVote(v) {
     <div class="cantons">${cs.map(([k, c]) => `<div class="ct" style="${tileStyle(c.oui)}" title="${k} : ${pct(c.oui)} ${ouiLbl(v)}, participation ${pct(c.participation)}"><b>${k}</b><span>${c.oui != null ? pct(c.oui) : "–"}</span></div>`).join("")}</div></section>` : ""}
   <section><h3>Argent de la campagne</h3>${a ? `<div class="legend"><span><i style="background:var(--infl)"></i>oui</span><span><i style="background:var(--money)"></i>non</span></div><p class="note">Recettes déclarées au CDF par les comités de chaque camp${budget ? ". Certains chiffres sont encore des budgets : le décompte final n'est pas publié" : ""}. Un même comité peut déclarer une campagne commune à plusieurs objets du même jour.</p>${camp("Pour", "i")}${camp("Contre", "m")}`
     : `<p class="note">Aucune campagne déclarée au CDF pour cet objet. L'obligation s'applique depuis le 23 octobre 2023, et seulement aux campagnes de plus de 50 000 CHF.</p>`}</section>
+  ${v.vote_final ? `<section id="vote-final"><p class="note">Chargement du vote final…</p></section>` : ""}
   ${Object.keys(v.mots_ordre || {}).length || v.conseil_federal ? `<section><h3>Mots d'ordre</h3><ul class="list">${v.conseil_federal ? parole("Conseil fédéral", v.conseil_federal) : ""}
     ${p.nrja || p.nrnein ? `<li><span>Conseil national</span><span>${p.nrja} oui, ${p.nrnein} non</span></li>` : ""}${p.srja || p.srnein ? `<li><span>Conseil des États</span><span>${p.srja} oui, ${p.srnein} non</span></li>` : ""}
     ${Object.entries(v.mots_ordre || {}).map(([k, c]) => parole(k, c)).join("")}</ul></section>` : ""}
@@ -351,7 +364,7 @@ const FRACTIONS = [["G", "Verts"], ["S", "PS"], ["GL", "Vert'libéraux"], ["M-E"
 const fcls = (f) => (FRACTIONS.some(([k]) => k === f) ? f.replace("-", "") : "X");
 const avatar = (e) => (e.photo ? `<img class="avatar" src="${esc(e.photo)}" alt="" width="32" height="32" loading="lazy" onerror="this.remove()">` : "");
 
-function hemicycle(conseil, seats, rows) {
+function hemicycle(conseil, seats, rows, paint, legend) {
   const order = new Map(FRACTIONS.map(([k], i) => [k, i]));
   const elus = L.elus.filter((e) => e.conseil === conseil)
     .sort((a, b) => (order.get(a.fraction) ?? 9) - (order.get(b.fraction) ?? 9) || a.parti.localeCompare(b.parti) || a.nom.localeCompare(b.nom));
@@ -365,12 +378,13 @@ function hemicycle(conseil, seats, rows) {
   pos.sort((p, q) => q.a - p.a);
   const dot = Math.min((R - r0) / (rows - 1), Math.PI * R / counts[rows - 1]) * 0.42;
   const circles = pos.map((p, i) => { const e = elus[i], at = `cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dot.toFixed(2)}"`;
-    return e ? `<circle class="seat" ${at} fill="var(--f-${fcls(e.fraction)})" data-open="elu" data-key="${e.id}"><title>${esc(e.nom)} (${esc(e.parti)}, ${esc(e.canton)})</title></circle>`
+    const pt = e && paint ? paint(e) : null;
+    return e ? `<circle class="seat${pt?.dim ? " dim" : ""}" ${at} fill="${pt ? pt.fill : `var(--f-${fcls(e.fraction)})`}" data-open="elu" data-key="${e.id}"><title>${esc(e.nom)} (${esc(e.parti)}, ${esc(e.canton)})${pt?.title ? ` : ${esc(pt.title)}` : ""}</title></circle>`
       : `<circle ${at} fill="none" stroke="var(--muted)" stroke-dasharray="1.5 1.5"><title>Siège non encore saisi par Lobbywatch</title></circle>`; }).join("");
   const n = (k) => elus.filter((e) => (FRACTIONS.some(([f]) => f === k) ? e.fraction === k : !FRACTIONS.some(([f]) => f === e.fraction))).length;
   const missing = seats - elus.length;
   return `<svg class="hemi" viewBox="0 0 ${2 * (R + O)} ${R + O + dot + 2}" role="img" aria-label="${esc(conseil === "CN" ? "Conseil national" : "Conseil des États")} : ${FRACTIONS.map(([k, l]) => `${l} ${n(k)}`).join(", ")}">${circles}</svg>
-  <div class="legend wrap-l">${FRACTIONS.filter(([k]) => n(k)).map(([k, l]) => `<span><i style="background:var(--f-${fcls(k)})"></i>${esc(l)} <b>${n(k)}</b></span>`).join("")}${n("X") ? `<span><i style="background:var(--f-X)"></i>Autres <b>${n("X")}</b></span>` : ""}${missing > 0 ? `<span><i class="vacant"></i>Non saisis <b>${missing}</b></span>` : ""}</div>`;
+  ${legend ?? `<div class="legend wrap-l">${FRACTIONS.filter(([k]) => n(k)).map(([k, l]) => `<span><i style="background:var(--f-${fcls(k)})"></i>${esc(l)} <b>${n(k)}</b></span>`).join("")}${n("X") ? `<span><i style="background:var(--f-X)"></i>Autres <b>${n("X")}</b></span>` : ""}${missing > 0 ? `<span><i class="vacant"></i>Non saisis <b>${missing}</b></span>` : ""}</div>`}`;
 }
 function renderHemis() {
   $("#n-elus").textContent = nf.format(L.elus.length);
@@ -378,10 +392,164 @@ function renderHemis() {
   $("#hemis").innerHTML = card("Conseil national", "200 sièges", hemicycle("CN", 200, 8)) + card("Conseil des États", "46 sièges", hemicycle("CE", 46, 4));
 }
 
+/* ---------------- Votes au Conseil national ---------------- */
+let PARL = null, parlLoading = null;
+const DECI = { o: ["Oui", "var(--yes)"], n: ["Non", "var(--no)"], a: ["Abstention", "var(--abst)"], "-": ["Absent·e", "var(--absent)"], p: ["Préside", "var(--absent)"] };
+const P_CHANCE = 0.0027;  // probabilité d'un |z| ≥ 3 par pur hasard
+function loadParl() {
+  return parlLoading ||= getJSON("parlement", null).then((p) => {
+    if (!p) return null;
+    p.idx = new Map(p.scrutins.map((s) => [String(s[0]), s]));
+    p.pnIndex = new Map(p.membres.map((m, i) => [m[0], i]));
+    p.scrutins.forEach((s) => { s._n = norm(`${s[2]} ${s[3]} ${s[4]} ${s[5]}`); });
+    PARL = p; return p;
+  });
+}
+const affaireUrl = (objet) => { const m = /^(\d\d)\.(\d+)$/.exec(objet || ""); return m ? `https://www.parlament.ch/fr/ratsbetrieb/suche-curia-vista/geschaeft?AffairId=${+m[1] > 50 ? 19 : 20}${m[1]}${m[2].padStart(4, "0")}` : ""; };
+const decision = (s, pn) => { const i = PARL.pnIndex.get(pn); return i == null ? " " : (s[8][i] || " "); };
+const scrutinTitre = (s) => `${s[3]}${s[5] ? ` (${s[5]})` : ""}`;
+function tally(s) { const c = { o: 0, n: 0, a: 0, "-": 0 }; for (const ch of s[8]) if (ch in c) c[ch]++; return c; }
+
+async function renderParlVotes() {
+  const box = $("#cn-votes");
+  if (!box || box.dataset.ready) return;
+  box.innerHTML = `<p class="note">Chargement des votes…</p>`;
+  const p = await loadParl();
+  if (!p) { box.innerHTML = `<p class="empty">Les votes apparaîtront après la prochaine mise à jour des données.</p>`; return; }
+  box.dataset.ready = "1";
+  const groupes = Object.entries(p.interets).sort((a, b) => b[1].scrutins.length - a[1].scrutins.length || a[0].localeCompare(b[0]));
+  box.innerHTML = `<div class="grid">
+    <div class="card wide"><h3>Les élus liés à un groupe d'intérêts votent-ils comme leur parti ?</h3>
+      <p class="hint">Pour chaque objet examiné par la commission compétente pour ce groupe, on compare la part de oui chez ses élus à celle qu'on attendrait d'après le vote de leurs propres groupes parlementaires. Un écart est « net » quand il est peu probable par hasard (|z| ≥ 3). Mandats actuels, pas forcément ceux du moment du vote. Un écart n'est pas une preuve d'influence.</p>
+      <div class="filters">${`<select id="pv-groupe" aria-label="Groupe d'intérêts">${groupes.map(([g, v]) => `<option value="${esc(g)}">${esc(g)} (${v.scrutins.length} écart${v.scrutins.length > 1 ? "s" : ""})</option>`).join("")}</select>`}</div>
+      <div id="pv-ecarts"></div></div>
+    <div class="card wide"><h3>Tous les scrutins</h3>
+      <div class="filters"><input type="search" id="pv-q" placeholder="Objet, numéro (24.060), mot-clé…" aria-label="Chercher un scrutin"></div>
+      <div id="pv-liste"></div></div></div>`;
+  $("#pv-groupe").addEventListener("input", renderEcarts);
+  $("#pv-q").addEventListener("input", renderScrutins);
+  renderEcarts(); renderScrutins();
+}
+function renderEcarts() {
+  const g = $("#pv-groupe").value, v = PARL.interets[g];
+  if (!v) { $("#pv-ecarts").innerHTML = ""; return; }
+  const hasard = v.testes * P_CHANCE;
+  $("#pv-ecarts").innerHTML = `<p class="summary"><span class="infl">${v.elus} élus liés</span> · ${nf.format(v.testes)} scrutins de leur domaine examinés (commission ${esc(v.commissions.join(", "))}) · <b>${v.scrutins.length} écart${v.scrutins.length > 1 ? "s" : ""} net${v.scrutins.length > 1 ? "s" : ""}</b>, dont environ ${hasard.toLocaleString("fr-CH", { maximumFractionDigits: 1 })} attendu${hasard >= 2 ? "s" : ""} par hasard${v.scrutins.length > 2 * hasard + 1 ? ' <span class="tag paid">au-delà du hasard</span>' : ""}</p>
+  ${v.scrutins.length ? `<ul class="list">${v.scrutins.map(([id, n, o, a, d, z]) => { const s = PARL.idx.get(String(id));
+    return `<li><span>${linkBtn("scrutin", id, scrutinTitre(s))}</span><span class="tag ${d > 0 ? "pour" : "contre"}">${d > 0 ? "+" : ""}${num1(d)} pts</span>
+    <span class="sub">${esc(dateFr(s[1]))} · ${esc(s[2])} · oui chez ces ${n} élus : <b>${num1(o)} %</b>, attendu d'après leurs partis : ${num1(a)} %</span></li>`; }).join("")}</ul>`
+    : `<p class="note">Ces élus votent comme leurs groupes parlementaires sur les objets de leur domaine : aucun écart net.</p>`}`;
+}
+function renderScrutins() {
+  const q = norm($("#pv-q").value).split(" ").filter(Boolean);
+  const rows = (q.length ? PARL.scrutins.filter((s) => matchAll(s._n, q)) : PARL.scrutins).slice(0, 40);
+  $("#pv-liste").innerHTML = rows.length ? `<ul class="list">${rows.map((s) => { const c = tally(s);
+    return `<li><span>${linkBtn("scrutin", s[0], scrutinTitre(s))}</span><span class="nowrap"><b class="infl">${c.o}</b> / <b class="money">${c.n}</b></span>
+    <span class="sub">${esc(dateFr(s[1]))} · ${esc(s[2])}${s[4] ? ` · ${esc(s[4])}` : ""}</span></li>`; }).join("")}</ul>${q.length ? "" : `<p class="note">Les 40 plus récents sur ${nf.format(PARL.scrutins.length)}. Cherchez un objet pour remonter plus loin.</p>`}`
+    : `<p class="empty">Aucun scrutin ne correspond.</p>`;
+}
+
+function sheetScrutin(id) {
+  const s = PARL?.idx.get(String(id));
+  if (!s) return "";
+  const c = tally(s), url = affaireUrl(s[2]);
+  const groupes = {};
+  PARL.membres.forEach((m, i) => { const d = s[8][i]; if (!d || d === " ") return; const g = groupes[m[2] || "?"] ||= { o: 0, n: 0, a: 0, "-": 0 }; if (d in g) g[d]++; });
+  const GLAB = Object.fromEntries(FRACTIONS);
+  const options = Object.entries(PARL.interets_membres).sort((a, b) => a[0].localeCompare(b[0]));
+  return `<h2>${esc(s[3])}</h2><p class="note">Conseil national, ${esc(dateFr(s[1]))}. Objet ${esc(s[2])}${s[4] ? ` : ${esc(s[4])}` : ""}${s[5] ? `. ${esc(s[5])}` : ""}</p>
+  <ul class="list"><li><span><b class="infl">Oui</b> : ${esc(s[6] || "–")}</span><span></span></li><li><span><b class="money">Non</b> : ${esc(s[7] || "–")}</span><span></span></li></ul>
+  <div class="kpis">${kpi(c.o, "oui", "infl")}${kpi(c.n, "non", "money")}${kpi(c.a, "abstentions")}${kpi(c["-"], "absent·e·s")}</div>
+  <section><h3>Qui a voté quoi</h3><div id="sc-hemi" data-id="${esc(String(id))}">${hemiScrutin(s)}</div>
+    <div class="filters"><select id="sc-groupe" aria-label="Mettre en évidence un groupe d'intérêts"><option value="">Mettre en évidence : les élus liés à…</option>${options.map(([g]) => `<option>${esc(g)}</option>`).join("")}</select></div>
+    <p class="summary" id="sc-ecart"></p></section>
+  <section><h3>Par groupe parlementaire</h3><div class="table-wrap"><table><thead><tr><th>Groupe</th><th class="num">Oui</th><th class="num">Non</th><th class="num">Abst.</th><th class="num">Abs.</th></tr></thead>
+    <tbody>${Object.entries(groupes).sort((a, b) => (b[1].o + b[1].n) - (a[1].o + a[1].n)).map(([g, v]) => `<tr><td>${esc(GLAB[g] || g)}</td><td class="num infl">${v.o}</td><td class="num money">${v.n}</td><td class="num">${v.a}</td><td class="num">${v["-"]}</td></tr>`).join("")}</tbody></table></div></section>
+  ${url ? `<p><a href="${esc(url)}" target="_blank" rel="noopener">Dossier de l'objet sur parlament.ch</a></p>` : ""}`;
+}
+function hemiScrutin(s, focus) {
+  const set = focus ? new Set(PARL.interets_membres[focus] || []) : null;
+  const paint = (e) => { const d = decision(s, e.pn); const [lbl, col] = DECI[d] || ["Pas en fonction", "none"];
+    return { fill: col, dim: set && !set.has(e.pn), title: lbl }; };
+  const c = tally(s);
+  return hemicycle("CN", 200, 8, paint, `<div class="legend wrap-l">${["o", "n", "a", "-"].map((k) => `<span><i style="background:${DECI[k][1]}"></i>${DECI[k][0]} <b>${c[k]}</b></span>`).join("")}</div>`);
+}
+function focusScrutin(g) {
+  const box = $("#sc-hemi"); if (!box) return;
+  const s = PARL.idx.get(box.dataset.id);
+  box.innerHTML = hemiScrutin(s, g);
+  if (!g) { $("#sc-ecart").textContent = ""; return; }
+  // Même calcul que scripts/build.py : oui observé contre oui attendu d'après le groupe de chaque élu (sans lui)
+  const gy = {}, gn = {};
+  PARL.membres.forEach((m, i) => { const d = s[8][i]; if (d === "o") gy[m[2]] = (gy[m[2]] || 0) + 1; if (d === "n") gn[m[2]] = (gn[m[2]] || 0) + 1; });
+  let obs = 0, att = 0, n = 0;
+  for (const pn of PARL.interets_membres[g] || []) {
+    const i = PARL.pnIndex.get(pn), d = s[8][i]; if (d !== "o" && d !== "n") continue;
+    const grp = PARL.membres[i][2], reste = (gy[grp] || 0) + (gn[grp] || 0) - 1; if (reste < 1) continue;
+    obs += d === "o"; att += ((gy[grp] || 0) - (d === "o")) / reste; n++;
+  }
+  $("#sc-ecart").innerHTML = n ? `${n} élus liés à « ${esc(g)} » ont voté : <b>${num1(100 * obs / n)} % de oui</b>, contre ${num1(100 * att / n)} % attendus d'après leurs partis (${100 * (obs - att) / n >= 0 ? "+" : ""}${num1(100 * (obs - att) / n)} pts).` : `Aucun élu lié à « ${esc(g)} » n'a voté oui ou non.`;
+}
+async function fillEluVotes(e) {
+  const box = $("#elu-votes"); if (!box) return;
+  const p = await loadParl(); if (!p || $("#elu-votes") !== box) return;
+  const st = p.elus[e.id];
+  if (!st) { box.innerHTML = `<p class="note">Pas de vote nominal pour cette législature.</p>`; return; }
+  box.innerHTML = `<div class="kpis">${kpi(st.participation != null ? pct(st.participation) : "–", "participation aux votes")}${kpi(nf.format(st.contre_groupe), "votes contre la majorité de son groupe")}</div>
+  ${st.recents.length ? `<p class="note">Derniers votes contre son groupe :</p><ul class="list">${st.recents.map((id) => { const s = p.idx.get(String(id)); return s ? `<li><span>${linkBtn("scrutin", id, scrutinTitre(s))}</span><span class="tag">${esc(DECI[decision(s, e.pn)]?.[0] || "")}</span><span class="sub">${esc(dateFr(s[1]))} · ${esc(s[2])}</span></li>` : ""; }).join("")}</ul>` : ""}`;
+}
+async function fillVoteFinal(v) {
+  const box = $("#vote-final"); if (!box) return;
+  const p = await loadParl(); if (!p || $("#vote-final") !== box) return;
+  const s = p.idx.get(String(v.vote_final));
+  if (!s) { box.remove(); return; }
+  const c = tally(s);
+  box.innerHTML = `<h3>Vote final au Conseil national</h3><p>${linkBtn("scrutin", s[0], scrutinTitre(s))}</p>
+  <p class="note">${esc(dateFr(s[1]))} : <b class="infl">${c.o} oui</b>, <b class="money">${c.n} non</b>, ${c.a} abstentions. Oui = ${esc(s[6] || "–")}.</p>`;
+}
+
+/* ---------------- Votations cantonales ---------------- */
+let CANT = null, cantLoading = null;
+const ROMANDIE = ["VD", "GE"];
+const loadCant = () => cantLoading ||= getJSON("cantonal", []).then((c) => { c.forEach((x) => { x._n = norm(`${x.titre} ${x.canton}`); }); CANT = c; return c; });
+async function renderCantonal() {
+  const box = $("#l-votes");
+  if (!CANT) { box.innerHTML = `<p class="note">Chargement des votations cantonales…</p>`; await loadCant(); }
+  if (!$("#fc-canton")) {
+    $("#f-cant").innerHTML = `<input type="search" id="fc-q" placeholder="Objet, mot-clé…" aria-label="Filtrer les votations cantonales">
+      <select id="fc-canton" aria-label="Canton"><option value="VD,GE">Vaud et Genève</option><option value="">Tous les cantons</option>${uniq(CANT.map((x) => x.canton)).sort().map((c) => `<option>${esc(c)}</option>`).join("")}</select>
+      ${select("fc-an", "Année", uniq(CANT.map((x) => x.date.slice(0, 4))).sort().reverse(), "Toutes")}
+      <select id="fc-res" aria-label="Résultat"><option value="">Résultat : tous</option><option value="1">Acceptés</option><option value="0">Refusés</option></select>`;
+    $("#f-cant").addEventListener("input", renderCantonal);
+  }
+  const q = norm($("#fc-q").value).split(" ").filter(Boolean), ct = $("#fc-canton").value.split(",").filter(Boolean);
+  const f = { an: $("#fc-an").value, res: $("#fc-res").value };
+  const rows = CANT.filter((x) => (!ct.length || ct.includes(x.canton)) && (!f.an || x.date.startsWith(f.an)) && (!f.res || String(+x.accepte) === f.res) && (!q.length || matchAll(x._n, q)));
+  $("#s-votes").textContent = `${rows.length} objet${rows.length > 1 ? "s" : ""} cantonaux`;
+  const byDate = new Map(); rows.forEach((x) => { if (!byDate.has(x.date)) byDate.set(x.date, []); byDate.get(x.date).push(x); });
+  box.innerHTML = [...byDate].map(([d, xs]) => `<div class="vote-day"><h3>${esc(dateFr(d))}</h3>${xs.map((x) => `<button class="vote-row" data-open="cantonal" data-key="${esc(x.id)}">
+    <span class="vr-head"><strong><span class="tag">${esc(x.canton)}</span> ${esc(x.titre)}</strong><span class="pill ${x.accepte ? "yes" : x.accepte === false ? "no" : ""}">${x.accepte ? "Accepté" : x.accepte === false ? "Refusé" : "En attente"}</span></span>
+    ${x.oui != null ? `<span class="yesno" role="img" aria-label="${pct(x.oui)} oui"><span style="width:${x.oui}%"></span></span><span class="sub"><b class="infl">${pct(x.oui)} oui</b> · participation ${pct(x.participation)}</span>` : ""}
+  </button>`).join("")}</div>`).join("") || `<p class="empty">Aucun objet pour ces filtres.</p>`;
+}
+function sheetCantonal(id) {
+  const x = CANT?.find((c) => c.id === id);
+  if (!x) return "";
+  const communes = [...x.communes].filter((c) => c[1] != null).sort((a, b) => b[1] - a[1]);
+  const oui = communes.filter((c) => c[1] > 50).length;
+  return `<h2>${esc(x.titre)}</h2><p class="note">Votation cantonale, ${esc(x.canton)}, ${esc(dateFr(x.date))}</p>
+  <p><span class="pill ${x.accepte ? "yes" : x.accepte === false ? "no" : ""}">${x.accepte ? "Accepté" : x.accepte === false ? "Refusé" : "En attente"}</span></p>
+  <div class="kpis">${kpi(pct(x.oui), "de oui", "infl")}${kpi(pct(x.participation), "participation")}${communes.length ? kpi(`${oui} / ${communes.length - oui}`, "communes oui / non") : ""}</div>
+  ${communes.length ? `<section><h3>Résultat par commune</h3><div class="legend"><span><i style="background:var(--infl)"></i>oui</span><span>trié du plus favorable au moins favorable</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Commune</th><th class="num">Oui</th><th class="num hide-s">Participation</th></tr></thead><tbody>
+    ${communes.map(([n, o, p]) => `<tr><td>${esc(n)}</td><td class="num"><span class="mini-bar"><span style="width:${o}%"></span></span> ${pct(o)}</td><td class="num hide-s">${pct(p)}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
+  <p class="note">Source : Office fédéral de la statistique. Le financement des campagnes cantonales n'est pas couvert par le Contrôle fédéral des finances.</p>`;
+}
+
 /* ---------------- Débats ---------------- */
 const { API = "", TS_KEY = "" } = window.QF || {};
-const DEBAT_TYPES = new Set(["donor", "recip", "elu", "org", "vote"]);
-const REF_LABEL = { donor: "Donateur", recip: "Bénéficiaire", elu: "Élu", org: "Organisation", vote: "Votation" };
+const DEBAT_TYPES = new Set(["donor", "recip", "elu", "org", "vote", "scrutin", "cantonal"]);
+const REF_LABEL = { donor: "Donateur", recip: "Bénéficiaire", elu: "Élu", org: "Organisation", vote: "Votation", scrutin: "Vote au CN", cantonal: "Votation cantonale" };
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* navigation privée */ } } };
 let DEVICE;
 const device = () => DEVICE ||= store.get("qf-device") || (store.set("qf-device", crypto.randomUUID()), store.get("qf-device")) || crypto.randomUUID();
@@ -449,7 +617,8 @@ let PROP = [];
 function refFromKey(ref) {
   const [type, ...rest] = ref.split(":"); const key = rest.join(":");
   const label = { donor: () => idx.donor.get(key)?.nom, recip: () => idx.recip.get(key)?.nom, org: () => idx.org.get(key)?.nom,
-    elu: () => idx.elu.get(Number(key))?.nom, vote: () => idx.vote.get(key)?.titre }[type]?.();
+    elu: () => idx.elu.get(Number(key))?.nom, vote: () => idx.vote.get(key)?.titre,
+    scrutin: () => { const s = PARL?.idx.get(key); return s && scrutinTitre(s); }, cantonal: () => { const x = CANT?.find((c) => c.id === key); return x && `${x.canton} : ${x.titre}`; } }[type]?.();
   return label ? { type, key, label } : null;
 }
 function searchRefs(q) {
@@ -457,7 +626,8 @@ function searchRefs(q) {
   const pick = (type, arr, key, label, n) => arr.filter((x) => matchAll(x._n, t)).slice(0, n).map((x) => ({ type, key: String(key(x)), label: label(x) }));
   return [...pick("vote", V, (v) => v.id, (v) => v.titre, 3), ...pick("elu", L.elus, (e) => e.id, (e) => e.nom, 3),
     ...pick("donor", [...idx.donor.values()], (g) => g.nom, (g) => g.nom, 3), ...pick("org", [...idx.org.values()], (o) => o.nom, (o) => o.nom, 3),
-    ...pick("recip", [...idx.recip.values()], (r) => r.nom, (r) => r.nom, 2)];
+    ...pick("recip", [...idx.recip.values()], (r) => r.nom, (r) => r.nom, 2),
+    ...(PARL ? pick("scrutin", PARL.scrutins, (x) => x[0], scrutinTitre, 3) : []), ...(CANT ? pick("cantonal", CANT, (x) => x.id, (x) => `${x.canton} : ${x.titre}`, 3) : [])];
 }
 function renderPropRefs() {
   $("#p-refs").innerHTML = PROP.map((r, i) => `<span class="chip ref"><small>${esc(REF_LABEL[r.type])}</small> ${esc(r.label)} <button type="button" class="x" data-delref="${i}" aria-label="Retirer ${esc(r.label)}">×</button></span>`).join("")
@@ -621,6 +791,8 @@ document.addEventListener("submit", (ev) => {
   else if (ev.target.classList.contains("f-com")) { ev.preventDefault(); submitCom(ev.target); }
 });
 document.addEventListener("input", (ev) => {
+  if (ev.target.id === "sc-groupe") { focusScrutin(ev.target.value); return; }
+  if (ev.target.id === "fv-niveau") { const c = ev.target.value === "cantonal"; $("#f-votes").hidden = c; $("#f-cant").hidden = !c; renderVotes(); return; }
   if (ev.target.id !== "p-ref-q") return;
   $("#p-ref-res").innerHTML = searchRefs(ev.target.value).map((r) => `<button type="button" class="ref-hit" data-addref="${esc(r.type)}:${esc(r.key)}"><small>${esc(REF_LABEL[r.type])}</small> ${esc(r.label)}</button>`).join("");
 });

@@ -20,6 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60  # le premier rattrapage des votes nominaux prend quelques minutes
     steps:
       - uses: actions/checkout@v4
 

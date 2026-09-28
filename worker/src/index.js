@@ -2,7 +2,7 @@
    Tout ce qui est proposé attend une validation avant publication (page site/admin.html). */
 
 const ORIGINS = ["https://dowdow27.github.io", "http://localhost:8000"];
-const REF_TYPES = new Set(["donor", "recip", "elu", "org", "vote"]);
+const REF_TYPES = new Set(["donor", "recip", "elu", "org", "vote", "scrutin", "cantonal"]);
 const MAX = { pseudo: 40, titre: 140, texte: 2000, commentaire: 1000, refs: 6, postsParJour: 5, votantsParIp: 5 };
 
 const fail = (status, message) => Object.assign(new Error(message), { status });

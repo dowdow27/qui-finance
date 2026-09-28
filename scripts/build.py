@@ -19,7 +19,9 @@ import json
 import os
 import re
 import sys
+import time
 import unicodedata
+import urllib.parse
 import urllib.request
 import zipfile
 from collections import defaultdict
@@ -38,6 +40,9 @@ PHOTO_URL = "https://www.parlament.ch/SiteCollectionImages/profil/portrait-260/{
 BIO_URL = "https://www.parlament.ch/fr/biografie?CouncillorId={}"
 SV_URL = "https://swissvotes.ch/page/dataset/swissvotes_dataset.csv"  # CC BY 4.0
 BFS_URL = "https://ogd-static.voteinfo-app.ch/v1/ogd/sd-t-17-02-{}-eidgAbstimmung.json"
+PARL_API = "https://ws.parlament.ch/odata.svc/"  # votes nominaux du Conseil national (Services du Parlement)
+KANT_PKG = ("https://ckan.opendata.swiss/api/3/action/package_show?"
+            "id=echtzeitdaten-am-abstimmungstag-zu-kantonalen-abstimmungsvorlagen")
 UA = {"User-Agent": "qui-finance-ch/1.0"}
 NOW = datetime.now(timezone.utc)
 MIN_ELUS = int(os.environ.get("MIN_ELUS", "100"))
@@ -193,6 +198,7 @@ def build_lobbywatch() -> dict:
         records = json.loads(zf.read(name))
 
     elus, liens, badges, orgs = [], [], [], {}
+    commissions = defaultdict(set)  # groupe d'intérêts -> commissions parlementaires de sa branche (« WAK », « SGK »…)
     for p in records:
         if p.get("aktiv") == 0 or p.get("im_rat_bis"):
             continue
@@ -209,6 +215,7 @@ def build_lobbywatch() -> dict:
             "fraction": p.get("fraktion") or "",
             "photo": PHOTO_URL.format(p["parlament_number"]) if p.get("parlament_number") else "",
             "parlement": BIO_URL.format(p["parlament_biografie_id"]) if p.get("parlament_biografie_id") else "",
+            "pn": p.get("parlament_biografie_id"),  # = PersonNumber des votes nominaux de parlament.ch
             "url": f"https://lobbywatch.ch/fr/daten/parlamentarier/{pid}",
         })
         for ib in p.get("interessenbindungen") or []:
@@ -228,6 +235,9 @@ def build_lobbywatch() -> dict:
             for key in (o.get("name_de"), o.get("name_fr")):
                 if key and norm(key):
                     orgs[norm(key)] = (groupe, secteur)
+            for k in ("interessengruppe_branche_kommission1_abkuerzung", "interessengruppe_branche_kommission2_abkuerzung"):
+                if o.get(k):
+                    commissions[groupe].add(o[k].split("-")[0])
         for z in p.get("zutrittsberechtigungen") or []:
             if z.get("bis"):
                 continue
@@ -241,7 +251,8 @@ def build_lobbywatch() -> dict:
             })
     if len(elus) < MIN_ELUS:
         raise RuntimeError(f"seulement {len(elus)} élus : export Lobbywatch incomplet ?")
-    return {"elus": elus, "liens": liens, "badges": badges, "orgs": orgs}
+    return {"elus": elus, "liens": liens, "badges": badges, "orgs": orgs,
+            "commissions": {g: sorted(c) for g, c in commissions.items()}}
 
 
 # --------------------------------------------------------------------------
@@ -435,11 +446,224 @@ def build_votes(campagnes: list[dict]) -> list[dict]:
             "conseil_federal": {"1": "pour", "2": "contre", "8": "contre-projet", "9": "initiative"}.get(r.get("br-pos")),
             "parlement": {k: int(fnum(r.get(k)) or 0) for k in ("nrja", "nrnein", "srja", "srnein")},
             "lien": r.get("swissvoteslink") or "",
+            "objet": (r.get("gesch_nr") or "").strip(),
         })
     match_campaigns(votes, campagnes)
     votes.sort(key=lambda v: float(v["id"]))
     votes.sort(key=lambda v: v["date"], reverse=True)
     return votes
+
+
+# --------------------------------------------------------------------------
+# Votes nominaux du Conseil national (parlament.ch), croisés avec les liens d'intérêts
+# --------------------------------------------------------------------------
+
+LEGISLATURE = 52  # depuis décembre 2023
+DECISION = {1: "o", 2: "n", 3: "a", 5: "-", 6: "-", 7: "p"}  # oui, non, abstention, absent/excusé, président
+SUJETS = {"Schlussabstimmung": "Vote final", "Gesamtabstimmung": "Vote sur l'ensemble", "Eintreten": "Entrée en matière",
+          "Rückweisungsantrag": "Proposition de renvoi", "Ausgabenbremse": "Frein aux dépenses"}
+PARL_CACHE = HIST / "parlement_cache.json"
+MIN_ELUS_GROUPE, MAX_ELUS_GROUPE, MIN_Z = 5, 60, 3.0  # groupes d'intérêts assez précis ; écarts nets seulement
+
+
+def odata(entity: str, filt: str, select: str) -> list[dict]:
+    """Toutes les lignes d'une requête OData (pages de 5000, trois nouvelles tentatives)."""
+    out, skip = [], 0
+    while True:
+        q = urllib.parse.urlencode({"$filter": filt, "$select": select, "$top": 5000, "$skip": skip, "$format": "json"},
+                                   quote_via=urllib.parse.quote)
+        for attempt in range(4):
+            try:
+                d = json.loads(http_get(f"{PARL_API}{entity}?{q}", timeout=120))["d"]
+                break
+            except Exception:  # noqa: BLE001
+                if attempt == 3:
+                    raise
+                time.sleep(5 * (attempt + 1))
+        rows = d.get("results", d) if isinstance(d, dict) else d
+        out += rows
+        if len(rows) < 5000:
+            return out
+        skip += 5000
+
+
+def odata_date(s: str) -> str:
+    m = re.search(r"\d+", s or "")
+    return datetime.fromtimestamp(int(m[0]) / 1000, timezone.utc).date().isoformat() if m else ""
+
+
+def fetch_parlement() -> dict:
+    """Met à jour le cache des scrutins : seuls les scrutins absents du cache sont téléchargés."""
+    cache = load_json(PARL_CACHE, {"ordre": [], "membres": {}, "scrutins": {}})
+    meta = odata("Vote", f"Language eq 'FR' and IdLegislativePeriod eq {LEGISLATURE}",
+                 "ID,BusinessShortNumber,BusinessTitle,BillTitle,Subject,MeaningYes,MeaningNo,VoteEnd")
+    if len(meta) < 100:
+        raise RuntimeError("liste des scrutins incomplète")
+    missing = sorted(v["ID"] for v in meta if str(v["ID"]) not in cache["scrutins"])
+    rows_by_vote = defaultdict(list)
+    for i in range(0, len(missing), 24):  # ~24 scrutins × 200 élus < 5000 lignes par requête
+        chunk = missing[i:i + 24]
+        for r in odata("Voting", f"Language eq 'FR' and IdVote ge {chunk[0]} and IdVote le {chunk[-1]}",
+                       "IdVote,PersonNumber,Decision,ParlGroupCode,FirstName,LastName,Canton"):
+            rows_by_vote[r["IdVote"]].append(r)
+    for v in meta:
+        vid = str(v["ID"])
+        if vid in cache["scrutins"] or not rows_by_vote.get(v["ID"]):
+            continue
+        votes = {}
+        for r in rows_by_vote[v["ID"]]:
+            pn = str(r["PersonNumber"])
+            m = cache["membres"].get(pn)
+            if not m:
+                cache["ordre"].append(pn)  # liste qui ne fait que s'allonger : les anciens codes restent valables
+            if not m or v["ID"] >= m.get("vu", 0):  # nom et groupe les plus récents
+                cache["membres"][pn] = {"nom": f"{r['FirstName']} {r['LastName']}", "groupe": r.get("ParlGroupCode") or "",
+                                        "canton": r.get("Canton") or "", "vu": v["ID"]}
+            votes[pn] = DECISION.get(r["Decision"], "-")
+        code = "".join(votes.get(pn, " ") for pn in cache["ordre"]).rstrip()
+        cache["scrutins"][vid] = {
+            "date": odata_date(v["VoteEnd"]), "objet": v.get("BusinessShortNumber") or "",
+            "titre": v.get("BillTitle") or v.get("BusinessTitle") or "", "affaire": v.get("BusinessTitle") or "",
+            "sujet": SUJETS.get(v.get("Subject") or "", v.get("Subject") or ""),
+            "oui": v.get("MeaningYes") or "", "non": v.get("MeaningNo") or "", "v": code,
+        }
+    # Commissions qui ont examiné chaque objet (abréviations allemandes, comme Lobbywatch)
+    com = defaultdict(set)
+    for r in odata("Preconsultation", "Language eq 'DE' and BusinessNumber ge 20000000", "BusinessShortNumber,Abbreviation1"):
+        if r.get("Abbreviation1"):
+            com[r["BusinessShortNumber"]].add(r["Abbreviation1"].split("-")[0])
+    if com:
+        cache["commissions"] = {k: sorted(v) for k, v in com.items()}
+    # Une ligne par scrutin : les diffs git restent petits d'une semaine à l'autre
+    PARL_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=0, sort_keys=True), encoding="utf-8")
+    return cache
+
+
+def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commissions: dict) -> dict:
+    by_pn = {str(e["pn"]): e for e in elus if e.get("pn")}
+    pns = cache["ordre"]
+    membres = [[int(pn), m["nom"], m["groupe"], m["canton"], by_pn[pn]["id"] if pn in by_pn else None]
+               for pn, m in ((pn, cache["membres"][pn]) for pn in pns)]
+    groupe = {pn: cache["membres"][pn]["groupe"] for pn in pns}
+    # Groupes d'intérêts Lobbywatch (plus fins que les secteurs) : élus ayant au moins un mandat en cours dedans
+    elu_pn = {e["id"]: str(e["pn"]) for e in elus if e.get("pn")}
+    interets, secteur_de = defaultdict(set), {}
+    for l in liens:
+        if l["p"] in elu_pn and l["groupe"] not in ("Non classé", "Partis"):
+            interets[l["groupe"]].add(elu_pn[l["p"]])
+            secteur_de[l["groupe"]] = l["secteur"]
+    interets = {g: m for g, m in interets.items() if MIN_ELUS_GROUPE <= len(m) <= MAX_ELUS_GROUPE and commissions.get(g)}
+    com_objet = cache.get("commissions", {})
+
+    ids = sorted(cache["scrutins"], key=int, reverse=True)
+    scrutins, stats, ecarts = [], defaultdict(lambda: {"vote": 0, "total": 0, "contre": 0, "recents": []}), defaultdict(list)
+    testes = defaultdict(int)
+    for vid in ids:
+        s = cache["scrutins"][vid]
+        code = s["v"]
+        votes = {pn: c for pn, c in zip(pns, code) if c != " "}
+        scrutins.append([int(vid), s["date"], s["objet"], s["titre"], s["affaire"] if s["affaire"] != s["titre"] else "",
+                         s["sujet"], s["oui"], s["non"], code])
+        gy, gn = defaultdict(int), defaultdict(int)
+        for pn, d in votes.items():
+            if d == "o":
+                gy[groupe[pn]] += 1
+            elif d == "n":
+                gn[groupe[pn]] += 1
+        for pn, d in votes.items():
+            if d in (" ", "p"):
+                continue
+            st = stats[pn]
+            st["total"] += 1
+            if d in "ona":
+                st["vote"] += 1
+            g = groupe[pn]
+            if d in "on" and gy[g] + gn[g] >= 3 and gy[g] != gn[g]:
+                majorite = "o" if gy[g] > gn[g] else "n"
+                if d != majorite:
+                    st["contre"] += 1
+                    if len(st["recents"]) < 10:
+                        st["recents"].append(int(vid))
+        # Écart des élus d'un groupe d'intérêts par rapport à ce qu'ont voté leurs groupes parlementaires,
+        # seulement sur les objets examinés par la commission de leur branche (sinon on mesure du bruit)
+        coms = set(com_objet.get(s["objet"], []))
+        for sect, members in interets.items():
+            if not coms & set(commissions[sect]):
+                continue
+            obs, att, qui = [], [], []
+            for pn in members:
+                d = votes.get(pn)
+                if d not in ("o", "n"):
+                    continue
+                g = groupe[pn]
+                reste = gy[g] + gn[g] - 1
+                if reste < 1:
+                    continue
+                obs.append(d == "o")
+                att.append((gy[g] - (d == "o")) / reste)
+                qui.append(int(pn))
+            if len(obs) >= MIN_ELUS_GROUPE:
+                testes[sect] += 1
+                var = sum(p * (1 - p) for p in att)
+                if var < 0.5:  # groupes quasi unanimes : pas d'écart mesurable
+                    continue
+                z = (sum(obs) - sum(att)) / var ** 0.5
+                if abs(z) >= MIN_Z:
+                    o, a = sum(obs) / len(obs), sum(att) / len(att)
+                    ecarts[sect].append([int(vid), len(obs), round(100 * o, 1), round(100 * a, 1), round(100 * (o - a), 1), round(z, 1)])
+    top = {g: {"secteur": secteur_de[g], "elus": len(interets[g]), "commissions": commissions[g], "testes": testes[g],
+               "scrutins": sorted(ecarts[g], key=lambda x: -abs(x[5]))[:25]} for g in interets if testes[g]}
+    elus_stats = {by_pn[pn]["id"]: {"participation": round(100 * st["vote"] / st["total"], 1) if st["total"] else None,
+                                    "contre_groupe": st["contre"], "recents": st["recents"]}
+                  for pn, st in stats.items() if pn in by_pn}
+    return {"legislature": LEGISLATURE, "membres": membres, "scrutins": scrutins, "elus": elus_stats, "interets": top,
+            "interets_membres": {g: sorted(int(pn) for pn in m) for g, m in interets.items()}}
+
+
+def link_final_votes(votes: list[dict], parl: dict) -> None:
+    """Rattache chaque votation populaire au vote final du Conseil national sur le même objet."""
+    finals = {}
+    for s in parl["scrutins"]:  # [id, date, objet, titre, affaire, sujet, ...], du plus récent au plus ancien
+        if s[5] == "Vote final" and s[2] not in finals:
+            finals[s[2]] = s[0]
+    for v in votes:
+        v["vote_final"] = finals.get(v.get("objet"))
+
+
+# --------------------------------------------------------------------------
+# Votations cantonales (OFS)
+# --------------------------------------------------------------------------
+
+
+def build_cantonal() -> list[dict]:
+    pkg = json.loads(http_get(KANT_PKG, timeout=60))["result"]
+    urls = sorted({r.get("download_url") or r.get("url") for r in pkg["resources"]})
+    out = []
+    for url in urls:
+        m = re.search(r"-(\d{4})(\d\d)(\d\d)-kantAbstimmung\.json$", url or "")
+        if not m or int(m[1]) < VOTES_SINCE:
+            continue
+        day = f"{m[1]}-{m[2]}-{m[3]}"
+        data = json.loads(http_get(url, timeout=120))
+        for k in data.get("kantone") or []:
+            for v in k.get("vorlagen") or []:
+                titres = {t["langKey"]: t["text"] for t in v.get("vorlagenTitel") or []}
+                r = v.get("resultat") or {}
+                communes = [[g.get("geoLevelname"), round(g["resultat"]["jaStimmenInProzent"], 1) if (g.get("resultat") or {}).get("jaStimmenInProzent") is not None else None,
+                             round((g.get("resultat") or {}).get("stimmbeteiligungInProzent") or 0, 1) or None]
+                            for g in v.get("gemeinden") or []]
+                oui = r.get("jaStimmenInProzent")
+                out.append({
+                    "id": str(v["vorlagenId"]), "canton": k.get("geoLevelname"), "date": day,
+                    "titre": (titres.get("fr") or titres.get("de") or titres.get("it") or next(iter(titres.values()), "")).strip(),
+                    "oui": round(oui, 2) if oui is not None else None,
+                    "participation": round(r["stimmbeteiligungInProzent"], 2) if r.get("stimmbeteiligungInProzent") is not None else None,
+                    "accepte": v.get("vorlageAngenommen"), "communes": communes,
+                })
+    if len(out) < 50:
+        raise RuntimeError("export cantonal incomplet")
+    out.sort(key=lambda x: (x["date"], x["canton"]), reverse=True)
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -461,10 +685,11 @@ def main() -> int:
     old_money = load_json(OUT / "argent.json", None)
     errors = []
 
-    lobby, orgs = old_lobby, {}
+    lobby, orgs, commissions = old_lobby, {}, {}
     try:
         lw = build_lobbywatch()
         orgs = lw.pop("orgs")
+        commissions = lw.pop("commissions")
         lobby = lw
         meta["sources"]["lobbywatch"] = {"statut": "ok", "maj": NOW.isoformat()}
     except Exception as e:  # noqa: BLE001
@@ -486,6 +711,24 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"swissvotes : {e}")
         meta["sources"].setdefault("swissvotes", {})["statut"] = f"échec : {e}"[:200]
+
+    parl = load_json(OUT / "parlement.json", None)
+    try:
+        parl = build_parlement(fetch_parlement(), lobby["elus"] if lobby else [], lobby["liens"] if lobby else [], commissions)
+        meta["sources"]["parlement"] = {"statut": "ok", "maj": NOW.isoformat()}
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"Parlement : {e}")
+        meta["sources"].setdefault("parlement", {})["statut"] = f"échec : {e}"[:200]
+    if votes and parl:
+        link_final_votes(votes, parl)
+
+    cantonal = load_json(OUT / "cantonal.json", None)
+    try:
+        cantonal = build_cantonal()
+        meta["sources"]["ofs_cantonal"] = {"statut": "ok", "maj": NOW.isoformat()}
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"OFS cantonal : {e}")
+        meta["sources"].setdefault("ofs_cantonal", {})["statut"] = f"échec : {e}"[:200]
 
     if lobby is None and money is None:
         print("Aucune source disponible :", *errors, sep="\n", file=sys.stderr)
@@ -532,9 +775,15 @@ def main() -> int:
         dump(OUT / "lobby.json", lobby)
     if votes is not None:
         dump(OUT / "votations.json", votes)
+    if parl is not None:
+        dump(OUT / "parlement.json", parl)
+    if cantonal is not None:
+        dump(OUT / "cantonal.json", cantonal)
     meta["genere"] = NOW.isoformat()
     meta["compteurs"] = {k: len(v) for src in (money or {}, lobby or {}) for k, v in src.items()}
     meta["compteurs"]["votations"] = len(votes or [])
+    meta["compteurs"]["scrutins"] = len((parl or {}).get("scrutins", []))
+    meta["compteurs"]["cantonal"] = len(cantonal or [])
     dump(OUT / "meta.json", meta)
 
     print(json.dumps(meta, ensure_ascii=False, indent=1))

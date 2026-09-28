@@ -6,6 +6,8 @@ Un site qui réunit, cherche et compare deux registres publics, mis à jour auto
 | --- | --- | --- |
 | Transparence du financement de la vie politique | Dons aux partis (> 15 000 CHF) et aux campagnes d'élection et de votation (> 50 000 CHF) | [Contrôle fédéral des finances (CDF)](https://politikfinanzierung.efk.admin.ch), via le miroir CSV [swiss-political-financing](https://github.com/lgnbhl/swiss-political-financing) |
 | Liens d'intérêts des parlementaires | Mandats, rémunérations communiquées, badges d'accès au Palais fédéral | [Lobbywatch.ch](https://lobbywatch.ch/datenexport/) |
+| Votes nominaux du Conseil national (législature en cours) | Vote de chaque élu sur chaque scrutin, commissions qui ont examiné chaque objet | [Services du Parlement](https://ws.parlament.ch/odata.svc) (cache incrémental dans `history/parlement_cache.json`) |
+| Votations cantonales (depuis 2023) | Résultats par canton et par commune | [OFS](https://opendata.swiss/fr/dataset/echtzeitdaten-am-abstimmungstag-zu-kantonalen-abstimmungsvorlagen) |
 | Votations fédérales (depuis 2023) | Résultats, résultats par canton, mots d'ordre | [Swissvotes](https://swissvotes.ch/page/dataset), complété par l'[OFS](https://opendata.swiss/fr/dataset/echtzeitdaten-am-abstimmungstag-zu-eidgenoessischen-abstimmungsvorlagen) pour les cantons |
 
 ## Ce que fait le site
@@ -13,7 +15,7 @@ Un site qui réunit, cherche et compare deux registres publics, mis à jour auto
 - **Chercher** : une seule barre pour les donateurs, bénéficiaires, élus, organisations et titulaires de badges. Chaque résultat ouvre une fiche, avec les liens croisés (une entreprise qui donne de l'argent ET qui a des élus dans ses conseils).
 - **Dons** : tableau filtrable par type (élection, votation, parti), parti, secteur, année, camp (pour ou contre), montant. Export CSV.
 - **Votations** : chaque objet fédéral depuis 2023, avec son résultat, la carte des cantons, les mots d'ordre, et l'argent du oui et du non (donateurs compris) quand les comités l'ont déclaré au CDF.
-- **Parlement** : composition du Conseil national et du Conseil des États (hémicycles cliquables), puis vue par élu ou par mandat, filtres par parti, conseil, secteur, rémunération. Export CSV.
+- **Parlement** : composition du Conseil national et du Conseil des États (hémicycles cliquables) ; votes nominaux du Conseil national (qui a voté quoi, par groupe) ; « les élus liés à un groupe d'intérêts votent-ils comme leur parti ? » ; puis vue par élu ou par mandat, filtres par parti, conseil, secteur, rémunération. Export CSV.
 - **Tendances** : plus gros donateurs, argent par secteur, argent reçu par parti, budget du oui contre budget du non pour chaque votation, secteurs les plus présents au Parlement, mandats rémunérés par parti, évolution semaine après semaine.
 - **Nouveautés** : ce qui a changé depuis la dernière mise à jour (nouveaux dons, nouveaux mandats, mandats terminés).
 
@@ -43,6 +45,8 @@ Onglet « Débats » : chacun propose une hypothèse qui cite au moins une fiche
 Un push sur ces fichiers relance la construction du site.
 
 ## Précautions de lecture
+
+- **Votes et intérêts** : pour chaque groupe d'intérêts Lobbywatch (5 à 60 élus), on ne compare que les objets examinés par la commission de sa branche. Part de oui chez ces élus contre part attendue d'après le vote de leur propre groupe parlementaire ; écart « net » si |z| ≥ 3. Avec des centaines de scrutins par groupe, environ un écart net sur 370 est attendu par hasard : le site l'indique. Mandats actuels, pas forcément ceux du moment du vote ; un écart n'est pas une preuve d'influence. Conseil national seulement (le Conseil des États ne publie pas ses votes nominaux dans l'API).
 
 - **Pas de double comptage** : pour chaque campagne, seul le décompte final est retenu, ou le budget tant que le décompte n'est pas publié.
 - **Couverture partielle** : seules les instances nationales des partis sont soumises à la loi, pas les sections cantonales. Les petits dons (< 15 000 CHF aux partis) restent anonymes.

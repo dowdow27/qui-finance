@@ -11,6 +11,7 @@
   --focus: #F2B705;
   /* groupes parlementaires (couleurs usuelles des partis) */
   --f-G: #6FA83A; --f-S: #D93A3A; --f-GL: #B3AE1F; --f-ME: #EF8C00; --f-RL: #2F6DB3; --f-V: #1F6B35; --f-X: #9AA4AE;
+  --yes: #1F5F8B; --no: #C8202A; --abst: #E0A100; --absent: #C9CEC6;
   --radius-s: 4px;
   --radius-l: 14px;
   color-scheme: light;
@@ -23,12 +24,14 @@
     --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
     --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark;
     --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
+    --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552;
   }
 }
 :root[data-theme="dark"] {
   --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
   --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark;
   --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
+  --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552;
 }
 *, *::before, *::after { box-sizing: inherit; }
 html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 64px); }
@@ -181,6 +184,10 @@ svg.line { width: 100%; height: auto; }
 svg.hemi { width: 100%; height: auto; display: block; margin: 0 0 10px; }
 svg.hemi .seat { cursor: pointer; }
 svg.hemi .seat:hover { stroke: var(--ink); stroke-width: 1.2; }
+svg.hemi .seat.dim { opacity: .18; }
+.nowrap { white-space: nowrap; }
+.mini-bar { display: inline-block; width: 60px; height: 8px; border-radius: 2px; background: var(--money-soft); vertical-align: middle; overflow: hidden; margin-right: 6px; }
+.mini-bar span { display: block; height: 100%; background: var(--infl); }
 .who { display: flex; align-items: center; gap: 10px; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; object-position: top; flex: none; background: var(--paper); }
 .elu-head { display: flex; gap: 16px; align-items: flex-start; }
