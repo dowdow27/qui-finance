@@ -956,45 +956,67 @@ async function renderUne() {
 const F_COLORS = { G: "#6FA83A", S: "#D93A3A", GL: "#B3AE1F", ME: "#EF8C00", RL: "#2F6DB3", V: "#1F6B35", X: "#9AA4AE" };  // pour l'image partagée (thème clair)
 let NET = null;  // dernière carte calculée (pour l'image partagée)
 
+const NET_OPT = { depth: 1, isoles: false };
 function netData(mode, key) {
-  const nodes = new Map(), links = [];
+  const nodes = new Map(), links = [], seen = new Set();
   const addElu = (e) => { if (!nodes.has(`e:${e.id}`)) nodes.set(`e:${e.id}`, { id: `e:${e.id}`, type: "elu", e, label: e.nom, paid: e.liens.filter((l) => l.statut === "remunere").length }); return nodes.get(`e:${e.id}`); };
   const addOrg = (o) => { if (!nodes.has(`o:${o}`)) nodes.set(`o:${o}`, { id: `o:${o}`, type: "org", label: o, n: 0 }); return nodes.get(`o:${o}`); };
-  const link = (e, l) => { const a = addElu(e), b = addOrg(l.org); b.n++; links.push({ s: a.id, t: b.id, paid: l.statut === "remunere", lien: l }); };
-  let titre = "", orgsSel;
+  const link = (e, l) => { const k = `${e.id}|${l.org}|${l.role}`; if (seen.has(k)) return; seen.add(k); const a = addElu(e), b = addOrg(l.org); b.n++; links.push({ s: a.id, t: b.id, paid: l.statut === "remunere", lien: l }); };
+  let titre = "", center = null;
   if (mode === "g") {
     const ls = L.liens.filter((l) => l.groupe === key);
     const byOrg = {}; ls.forEach((l) => { (byOrg[l.org] ||= new Set()).add(l.p); });
-    orgsSel = new Set(Object.entries(byOrg).sort((a, b) => b[1].size - a[1].size).slice(0, 45).map(([o]) => o));
+    const orgsSel = new Set(Object.entries(byOrg).sort((a, b) => b[1].size - a[1].size).slice(0, 60).map(([o]) => o));
     ls.filter((l) => orgsSel.has(l.org)).forEach((l) => { const e = idx.elu.get(l.p); if (e) link(e, l); });
     titre = `Groupe d'intérêts : ${key}`;
   } else if (mode === "elu") {
     const c = idx.elu.get(+key); if (!c) return null;
-    c.liens.slice(0, 40).forEach((l) => link(c, l));
-    const orgs = new Set(c.liens.slice(0, 40).map((l) => l.org)), voisins = {};
+    center = `e:${c.id}`;
+    c.liens.forEach((l) => link(c, l));
+    const orgs = new Set(c.liens.map((l) => l.org)), voisins = {};
     L.liens.forEach((l) => { if (l.p !== c.id && orgs.has(l.org)) (voisins[l.p] ||= []).push(l); });
-    Object.entries(voisins).sort((a, b) => b[1].length - a[1].length).slice(0, 22).forEach(([p, ls]) => { const e = idx.elu.get(+p); if (e) ls.forEach((l) => link(e, l)); });
+    const proches = Object.entries(voisins).sort((a, b) => b[1].length - a[1].length).slice(0, 25).map(([p, ls]) => [idx.elu.get(+p), ls]).filter(([e]) => e);
+    proches.forEach(([e, ls]) => ls.forEach((l) => link(e, l)));
+    if (NET_OPT.depth === 2) proches.forEach(([e]) => e.liens.forEach((l) => link(e, l)));  // 2e niveau : liens entre voisins
     titre = `Le réseau de ${c.nom}`;
   } else if (mode === "org") {
     const o = idx.org.get(key); if (!o) return null;
+    center = `o:${key}`;
     const elus = uniq(o.liens.map((l) => l.p)).map((p) => idx.elu.get(p)).filter(Boolean);
     o.liens.forEach((l) => { const e = idx.elu.get(l.p); if (e) link(e, l); });
-    const autres = {}; elus.forEach((e) => e.liens.forEach((l) => { if (l.org !== key) (autres[l.org] ||= []).push([e, l]); }));
-    Object.entries(autres).filter(([, v]) => v.length >= 2).sort((a, b) => b[1].length - a[1].length).slice(0, 30).forEach(([, v]) => v.forEach(([e, l]) => link(e, l)));
+    if (NET_OPT.depth === 2) elus.forEach((e) => e.liens.forEach((l) => link(e, l)));
+    else { const autres = {}; elus.forEach((e) => e.liens.forEach((l) => { if (l.org !== key) (autres[l.org] ||= []).push([e, l]); }));
+      Object.entries(autres).filter(([, v]) => v.length >= 2).sort((a, b) => b[1].length - a[1].length).slice(0, 30).forEach(([, v]) => v.forEach(([e, l]) => link(e, l))); }
     titre = `Autour de ${key}`;
   }
-  // Badges : un élu qui fait entrer un lobbyiste d'une organisation présente sur la carte
   const badges = [];
   L.badges.filter(isLobbyiste).forEach((b) => { const org = orgBadge(b), e = idx.elu.get(b.p);
     if (e && nodes.has(`e:${e.id}`) && nodes.has(`o:${org}`)) badges.push({ s: `e:${e.id}`, t: `o:${org}`, badge: b }); });
-  return { titre, nodes: [...nodes.values()], links, badges };
+  return simplify({ titre, center, nodes: [...nodes.values()], links, badges });
+}
+// Organisations reliées à un seul élu : repliées en « +N mandats » sur l'élu (comme les nœuds isolés masqués d'Obsidian)
+function simplify(net) {
+  const deg = new Map(); net.links.forEach((l) => deg.set(l.t, (deg.get(l.t) || 0) + 1));
+  net.nodes.forEach((n) => { n.extra = 0; });
+  net.isolated = []; net.replies = 0;
+  if (NET_OPT.isoles) return net;
+  const leaf = new Set(net.nodes.filter((n) => n.type === "org" && (deg.get(n.id) || 0) < 2 && n.id !== net.center).map((n) => n.id));
+  const byId = new Map(net.nodes.map((n) => [n.id, n]));
+  net.links.forEach((l) => { if (leaf.has(l.t)) byId.get(l.s).extra++; });
+  net.links = net.links.filter((l) => !leaf.has(l.t));
+  const keep = new Set(net.links.flatMap((l) => [l.s, l.t])); if (net.center) keep.add(net.center);
+  net.isolated = net.nodes.filter((n) => n.type === "elu" && !keep.has(n.id));
+  net.nodes = net.nodes.filter((n) => keep.has(n.id));
+  net.badges = net.badges.filter((b) => keep.has(b.s) && keep.has(b.t));
+  net.replies = leaf.size;
+  return net;
 }
 
 function layout(net) {
   const N = net.nodes, byId = new Map(N.map((n) => [n.id, n]));
-  N.forEach((n, i) => { n.r = n.type === "elu" ? 7 + Math.min(10, n.paid * 0.8) : 5 + Math.min(16, n.n * 2.2); const a = i * 2.39996; n.x = Math.cos(a) * 12 * Math.sqrt(i + 1); n.y = Math.sin(a) * 12 * Math.sqrt(i + 1); n.vx = 0; n.vy = 0; });
+  N.forEach((n, i) => { n.r = n.type === "elu" ? 7 + Math.min(9, n.paid * 0.7) : 5 + Math.min(11, Math.sqrt(n.n) * 2.4); const a = i * 2.39996; n.x = Math.cos(a) * 12 * Math.sqrt(i + 1); n.y = Math.sin(a) * 12 * Math.sqrt(i + 1); n.vx = 0; n.vy = 0; });
   const E = net.links.concat(net.badges).map((l) => ({ a: byId.get(l.s), b: byId.get(l.t), k: l.badge ? 0.02 : l.paid ? 0.06 : 0.04 }));
-  const REP = 900 + 30 * N.length, REST = 26 + N.length / 3;  // cartes chargées : bulles plus espacées
+  const REP = 1400 + 45 * N.length, REST = 34 + N.length / 2.5;  // cartes chargées : bulles plus espacées
   for (let it = 0; it < 320; it++) {
     const alpha = 1 - it / 320;
     for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) {  // répulsion + collision
@@ -1019,27 +1041,50 @@ function renderReseaux(q) {
   const groupes = uniq(L.liens.map((l) => l.groupe)).filter((g) => g !== "Non classé" && g !== "Partis").sort((a, b) => a.localeCompare(b));
   const [mode, ...rest] = (q || "").split("|"), key = rest.join("|");
   const m = ["g", "elu", "org"].includes(mode) && key ? mode : "g", k = m === "g" && !groupes.includes(key) ? (groupes.includes("Assurances") ? "Assurances" : groupes[0]) : key;
-  $("#f-net").innerHTML = `<select id="fn-groupe" aria-label="Groupe d'intérêts">${groupes.map((g) => `<option${m === "g" && g === k ? " selected" : ""}>${esc(g)}</option>`).join("")}</select>
-    <input type="search" id="fn-q" list="fn-list" placeholder="Ou un élu, une organisation…" aria-label="Centrer sur un élu ou une organisation"><datalist id="fn-list"></datalist>`;
+  $("#f-net").innerHTML = `<select id="fn-groupe" aria-label="Groupe d'intérêts"><option value="">Groupe d'intérêts…</option>${groupes.map((g) => `<option${m === "g" && g === k ? " selected" : ""}>${esc(g)}</option>`).join("")}</select>
+    <input type="search" id="fn-q" list="fn-list" placeholder="Ou un élu, une organisation…" aria-label="Centrer sur un élu ou une organisation"><datalist id="fn-list"></datalist>
+    ${m !== "g" ? `<select id="fn-depth" aria-label="Profondeur"><option value="1"${NET_OPT.depth === 1 ? " selected" : ""}>Voisins directs</option><option value="2"${NET_OPT.depth === 2 ? " selected" : ""}>Voisins des voisins</option></select>` : ""}
+    <label class="check"><input type="checkbox" id="fn-isoles"${NET_OPT.isoles ? " checked" : ""}> Mandats isolés</label>`;
   const net = netData(m, k);
   if (!net || !net.nodes.length) { box.innerHTML = `<p class="empty">Rien à afficher.</p>`; return; }
   NET = layout(net);
+  const deg = new Map(); NET.links.forEach((l) => { deg.set(l.s, (deg.get(l.s) || 0) + 1); deg.set(l.t, (deg.get(l.t) || 0) + 1); });
+  NET.deg = deg;
+  // Niveau d'étiquette : 1 toujours visible, 2 en zoomant, 3 en zoomant fort (comme le « text fade threshold » d'Obsidian)
+  const petit = NET.nodes.length <= 55;  // petite carte : tous les noms d'emblée
+  const lvl = (n) => (n.id === NET.center || petit ? 1 : n.type === "org" ? (n.n >= 4 ? 1 : n.n >= 3 ? 2 : 3) : ((deg.get(n.id) || 0) >= 3 ? 1 : (deg.get(n.id) || 0) >= 2 ? 2 : 3));
   const [x0, y0, w, h] = NET.box;
-  const lines = NET.links.map((l) => { const a = NET.byId.get(l.s), b = NET.byId.get(l.t); return `<line data-s="${esc(l.s)}" data-t="${esc(l.t)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="${l.paid ? "l-paid" : "l-free"}"><title>${esc(a.label)} → ${esc(b.label)} : ${esc(ROLE[l.lien.role] || l.lien.role)}${l.paid ? ", rémunéré" : ""}</title></line>`; }).join("")
-    + NET.badges.map((l) => { const a = NET.byId.get(l.s), b = NET.byId.get(l.t); return `<line data-s="${esc(l.s)}" data-t="${esc(l.t)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="l-badge"><title>${esc(a.label)} fait entrer ${esc(l.badge.nom)} (${esc(b.label)}) au Palais fédéral</title></line>`; }).join("");
+  const ln = (l, cls, title) => { const a = NET.byId.get(l.s), b = NET.byId.get(l.t); return `<line data-s="${esc(l.s)}" data-t="${esc(l.t)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="${cls}"><title>${esc(title)}</title></line>`; };
+  const lines = NET.links.map((l) => ln(l, l.paid ? "l-paid" : "l-free", `${NET.byId.get(l.s).label} → ${NET.byId.get(l.t).label} : ${ROLE[l.lien.role] || l.lien.role}${l.paid ? ", rémunéré" : ""}`)).join("")
+    + NET.badges.map((l) => ln(l, "l-badge", `${NET.byId.get(l.s).label} fait entrer ${l.badge.nom} (${NET.byId.get(l.t).label}) au Palais fédéral`)).join("");
   const circles = NET.nodes.map((n) => {
-    const lbl = n.type === "elu" ? n.label.split(" ").slice(-1)[0] : (n.n >= 3 || NET.nodes.length <= 70) ? (n.label.length > 22 ? n.label.slice(0, 20) + "…" : n.label) : "";
-    return `<g class="node ${n.type}" data-id="${esc(n.id)}" data-net="${n.type === "elu" ? `elu|${n.e.id}` : `org|${esc(n.label)}`}" tabindex="0" role="button" aria-label="${esc(n.label)}">
-      <circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.r.toFixed(1)}" ${n.type === "elu" ? `fill="var(--f-${fcls(n.e.fraction)})"` : ""}><title>${esc(n.label)}${n.type === "elu" ? ` (${esc(n.e.parti)}, ${esc(n.e.canton)}) : ${n.paid} mandats rémunérés` : ` : ${n.n} élu${n.n > 1 ? "s" : ""} sur cette carte`}</title></circle>
-      ${lbl ? `<text x="${n.x.toFixed(1)}" y="${(n.y + n.r + 10).toFixed(1)}">${esc(lbl)}</text>` : ""}</g>`; }).join("");
+    const lbl = n.type === "elu" ? `${n.label.split(" ").slice(-1)[0]}${n.extra ? ` +${n.extra}` : ""}` : (n.label.length > 26 ? n.label.slice(0, 24) + "…" : n.label);
+    return `<g class="node ${n.type} lvl${lvl(n)}${n.id === NET.center ? " center" : ""}" data-id="${esc(n.id)}" data-net="${n.type === "elu" ? `elu|${n.e.id}` : `org|${esc(n.label)}`}" tabindex="0" role="button" aria-label="${esc(n.label)}">
+      <circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.r.toFixed(1)}" ${n.type === "elu" ? `fill="var(--f-${fcls(n.e.fraction)})"` : ""}><title>${esc(n.label)}${n.type === "elu" ? ` (${esc(n.e.parti)}, ${esc(n.e.canton)}) : ${n.paid} mandats rémunérés${n.extra ? `, ${n.extra} mandats sans autre élu sur cette carte` : ""}` : ` : ${n.n} élu${n.n > 1 ? "s" : ""} sur cette carte`}</title></circle>
+      <text x="${n.x.toFixed(1)}" y="${(n.y + n.r + 9).toFixed(1)}">${esc(lbl)}</text></g>`; }).join("");
   const nElus = NET.nodes.filter((n) => n.type === "elu").length, nOrgs = NET.nodes.length - nElus;
-  box.innerHTML = `<p class="summary">${esc(NET.titre)} · <span class="infl">${nElus} élus</span>, ${nOrgs} organisations, ${NET.links.filter((l) => l.paid).length} mandats rémunérés${NET.badges.length ? `, ${NET.badges.length} badge${NET.badges.length > 1 ? "s" : ""} de lobbyiste` : ""}</p>
-    <div class="net-wrap"><svg class="net" viewBox="${x0.toFixed(0)} ${y0.toFixed(0)} ${w.toFixed(0)} ${h.toFixed(0)}" role="img" aria-label="${esc(NET.titre)}">${lines}${circles}</svg></div>
-    <div class="legend wrap-l"><span><i style="background:var(--money)"></i>mandat rémunéré</span><span><i style="background:var(--rule)"></i>mandat bénévole ou non communiqué</span><span><i class="dash"></i>badge d'accès donné à un lobbyiste</span><span><i class="org-dot"></i>organisation</span><span>bulle colorée : élu (couleur du groupe)</span></div>
-    <p class="note">Cliquez une bulle pour recentrer la carte sur elle. Taille : mandats rémunérés (élus) ou nombre d'élus liés (organisations). Un lien n'est pas une faute : c'est une information.</p>
+  const carrefours = NET.nodes.filter((n) => n.type === "org").sort((a, b) => b.n - a.n).slice(0, 10);
+  const connectes = NET.nodes.filter((n) => n.type === "elu").sort((a, b) => (deg.get(b.id) || 0) - (deg.get(a.id) || 0) || b.paid - a.paid).slice(0, 10);
+  const item = (n, right) => `<li><button class="link" data-net-focus="${esc(n.id)}">${esc(n.label)}</button><span class="note">${esc(right)}</span></li>`;
+  box.innerHTML = `<p class="summary">${esc(NET.titre)} · <span class="infl">${nElus} élus</span>, ${nOrgs} organisations partagées${NET.replies ? ` (${NET.replies} mandats isolés repliés en « +N »)` : ""}${NET.badges.length ? `, ${NET.badges.length} badge${NET.badges.length > 1 ? "s" : ""} de lobbyiste` : ""}</p>
+    <div class="net-layout"><div class="net-wrap">
+      <div class="net-tools"><button class="btn ghost" data-zoom="in" aria-label="Zoomer">+</button><button class="btn ghost" data-zoom="out" aria-label="Dézoomer">−</button><button class="btn ghost" data-zoom="reset" aria-label="Recentrer">⟲</button></div>
+      <svg class="net" viewBox="${x0.toFixed(0)} ${y0.toFixed(0)} ${w.toFixed(0)} ${h.toFixed(0)}" role="img" aria-label="${esc(NET.titre)}" data-z="1" style="--k:1"><g class="vp">${lines}${circles}</g></svg>
+    </div>
+    <aside class="net-side">
+      <h4>Carrefours</h4><p class="note">Organisations qui réunissent le plus d'élus sur la carte</p><ul class="list">${carrefours.map((n) => item(n, `${n.n} élus`)).join("") || "<li class='note'>Aucune</li>"}</ul>
+      <h4>Élus les plus connectés</h4><ul class="list">${connectes.map((n) => { const d = deg.get(n.id) || 0; return item(n, `${d} lien${d > 1 ? "s" : ""} · ${n.e.parti}`); }).join("")}</ul>
+      ${NET.isolated.length ? `<details class="more"><summary>${NET.isolated.length} élus sans organisation partagée</summary><ul class="list">${NET.isolated.map((n) => `<li>${linkBtn("elu", n.e.id, n.e.nom)}<span class="note">${esc(n.e.parti)}</span></li>`).join("")}</ul></details>` : ""}
+    </aside></div>
+    <div class="legend wrap-l"><span><i style="background:var(--money)"></i>mandat rémunéré</span><span><i style="background:var(--rule)"></i>mandat bénévole ou non communiqué</span><span><i class="dash"></i>badge d'accès donné à un lobbyiste</span><span><i class="org-dot"></i>organisation</span><span>bulle colorée : élu (couleur du groupe) · « +N » : mandats sans autre élu sur la carte</span></div>
+    <p class="note">Survolez ou touchez une bulle pour voir ses liens. Molette ou pincement pour zoomer, glisser pour se déplacer : les noms apparaissent en zoomant. Un lien n'est pas une faute : c'est une information.</p>
     <div id="net-info"></div>
     ${shareBtn("reseau", shareNet)}`;
-  $("#fn-groupe").addEventListener("change", (ev) => { location.hash = `#reseaux:g|${ev.target.value}`; });
+  netInteractions($("svg.net"));
+  if (NET.center) netHighlight(NET.center, true);
+  $("#fn-groupe").addEventListener("change", (ev) => { if (ev.target.value) location.hash = `#reseaux:g|${ev.target.value}`; });
+  $("#fn-depth")?.addEventListener("change", (ev) => { NET_OPT.depth = +ev.target.value; renderReseaux(q); });
+  $("#fn-isoles").addEventListener("change", (ev) => { NET_OPT.isoles = ev.target.checked; renderReseaux(q); });
   $("#fn-q").addEventListener("input", (ev) => {
     const t = norm(ev.target.value).split(" ").filter(Boolean); if (!t.length) return;
     const hits = [...L.elus.filter((e) => matchAll(e._n, t)).slice(0, 5).map((e) => [e.nom, `elu|${e.id}`]), ...[...idx.org.values()].filter((o) => matchAll(o._n, t)).slice(0, 5).map((o) => [o.nom, `org|${o.nom}`])];
@@ -1047,12 +1092,64 @@ function renderReseaux(q) {
     const exact = hits.find(([l]) => l === ev.target.value); if (exact) location.hash = `#reseaux:${exact[1]}`;
   });
 }
+
+// Zoom (molette, pincement, boutons) et déplacement (glisser), comme la vue graphe d'Obsidian
+function netInteractions(svg) {
+  const g = svg.querySelector(".vp"); let k = 1, tx = 0, ty = 0, moved = false;
+  const pts = new Map(); let pinch0 = null;
+  const apply = () => { g.setAttribute("transform", `translate(${tx.toFixed(1)} ${ty.toFixed(1)}) scale(${k.toFixed(3)})`); svg.style.setProperty("--k", k.toFixed(3)); svg.dataset.z = k >= 2.2 ? "3" : k >= 1.4 ? "2" : "1"; };
+  const user = (cx, cy) => { const p = svg.createSVGPoint(); p.x = cx; p.y = cy; return p.matrixTransform(svg.getScreenCTM().inverse()); };
+  const zoomAt = (f, cx, cy) => { const p = user(cx, cy), nk = Math.min(8, Math.max(0.6, k * f)); tx = p.x - (p.x - tx) * nk / k; ty = p.y - (p.y - ty) * nk / k; k = nk; apply(); };
+  const rect = () => svg.getBoundingClientRect();
+  svg._net = {
+    zoom(f) { const r = rect(); zoomAt(f, r.left + r.width / 2, r.top + r.height / 2); },
+    reset() { k = 1; tx = 0; ty = 0; apply(); },
+    focus(x, y) { const vb = svg.viewBox.baseVal; if (k < 1.8) k = 1.8; tx = vb.x + vb.width / 2 - x * k; ty = vb.y + vb.height / 2 - y * k; apply(); },
+  };
+  svg.addEventListener("wheel", (e) => { e.preventDefault(); zoomAt(e.deltaY < 0 ? 1.18 : 1 / 1.18, e.clientX, e.clientY); }, { passive: false });
+  svg.addEventListener("pointerdown", (e) => { pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = false; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); } });
+  svg.addEventListener("pointermove", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2 && pinch0) { const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); zoomAt(d / pinch0, (a.x + b.x) / 2, (a.y + b.y) / 2); pinch0 = d; moved = true; return; }
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y; if (Math.abs(dx) + Math.abs(dy) < 1) return;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+    if (!moved) svg.setPointerCapture(e.pointerId);
+    moved = true; const s = svg.viewBox.baseVal.width / rect().width; tx += dx * s; ty += dy * s; apply();
+  });
+  const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; };
+  svg.addEventListener("pointerup", up); svg.addEventListener("pointercancel", up);
+  svg.addEventListener("click", (e) => { if (moved) { e.stopPropagation(); moved = false; return; } if (!e.target.closest(".node")) netHighlight(null, true); }, true);
+  // Survol à la souris : surbrillance temporaire des voisins
+  svg.addEventListener("pointerover", (e) => { const n = e.target.closest(".node"); if (n && e.pointerType === "mouse" && !pts.size) netHighlight(n.dataset.id, false); });
+  svg.addEventListener("pointerout", (e) => { const n = e.target.closest(".node"); if (n && e.pointerType === "mouse") netHighlight(svg.dataset.sel || null, false); });
+  apply();
+}
+function netHighlight(id, sticky) {
+  const svg = $("svg.net"); if (!svg) return;
+  if (sticky) { if (id) svg.dataset.sel = id; else delete svg.dataset.sel; }
+  svg.classList.toggle("sel", !!id);
+  const near = new Set(id ? [id] : []);
+  svg.querySelectorAll("line").forEach((l) => { const on = !!id && (l.dataset.s === id || l.dataset.t === id); l.classList.toggle("dim", !!id && !on); l.classList.toggle("hl", on); if (on) { near.add(l.dataset.s); near.add(l.dataset.t); } });
+  svg.querySelectorAll(".node").forEach((n) => { n.classList.toggle("dim", !!id && !near.has(n.dataset.id)); n.classList.toggle("hl", !!id && near.has(n.dataset.id)); });
+}
 function netInfo(ref) {
   const [type, ...rest] = ref.split("|"), key = rest.join("|");
   const e = type === "elu" ? idx.elu.get(+key) : null, o = type === "org" ? idx.org.get(key) : null;
   $("#net-info").innerHTML = `<div class="card net-card"><strong>${esc(e ? e.nom : key)}</strong> <small class="note">${e ? `${esc(e.parti)}, ${esc(e.canton)} · ${e.liens.length} mandats` : o ? `${esc(o.groupe)} · ${uniq(o.liens.map((l) => l.p)).length} élus liés` : ""}</small>
-    <div class="answers"><a class="btn" href="#reseaux:${esc(ref)}">Recentrer la carte</a>${linkBtn(e ? "elu" : "org", e ? e.id : key, "Ouvrir la fiche")}</div></div>`;
+    <div class="answers"><a class="btn" href="#reseaux:${esc(ref)}">Centrer la carte sur ${e ? "cet élu" : "cette organisation"}</a>${linkBtn(e ? "elu" : "org", e ? e.id : key, "Ouvrir la fiche")}</div></div>`;
 }
+function netSelect(ref) {
+  const [type, ...rest] = ref.split("|");
+  netHighlight(type === "elu" ? `e:${rest[0]}` : `o:${rest.join("|")}`, true);
+  netInfo(ref);
+}
+function netFocus(id) {
+  const n = NET?.byId.get(id), svg = $("svg.net"); if (!n || !svg) return;
+  svg._net.focus(n.x, n.y); netSelect(n.type === "elu" ? `elu|${n.e.id}` : `org|${n.label}`);
+  svg.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
 async function shareNet() {
   if (!NET) return;
   await document.fonts?.ready;
@@ -1076,16 +1173,6 @@ async function shareNet() {
   const blob = await new Promise((r) => c.toBlob(r, "image/png")), f = new File([blob], "reseau.png", { type: "image/png" }), msg = `${NET.titre} : qui est lié à qui au Parlement ? ${SITE_URL}`;
   if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f], text: msg }); return; } catch (e) { if (e.name === "AbortError") return; } }
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "reseau.png"; a.click(); navigator.clipboard?.writeText(msg).catch(() => {});
-}
-
-function netSelect(ref) {
-  netInfo(ref);
-  const [type, ...rest] = ref.split("|"), id = type === "elu" ? `e:${rest[0]}` : `o:${rest.join("|")}`;
-  const svg = $("svg.net"); if (!svg) return;
-  const near = new Set([id]);
-  svg.querySelectorAll("line").forEach((l) => { const on = l.dataset.s === id || l.dataset.t === id; l.classList.toggle("dim", !on); if (on) { near.add(l.dataset.s); near.add(l.dataset.t); } });
-  svg.querySelectorAll(".node").forEach((g) => g.classList.toggle("dim", !near.has(g.dataset.id)));
-  svg.classList.add("sel");
 }
 
 /* ---------------- Débats ---------------- */
@@ -1321,6 +1408,8 @@ document.addEventListener("click", (ev) => {
   const q = ev.target.closest("[data-q]"); if (q) { $("#q").value = q.dataset.q; search(); return; }
   const dq = ev.target.closest("[data-dons-q]"); if (dq) { location.hash = "#dons"; $("#fd-q").value = dq.dataset.donsQ; renderDons(); return; }
   const nn = ev.target.closest("[data-net]"); if (nn) { netSelect(nn.dataset.net); return; }
+  const nf = ev.target.closest("[data-net-focus]"); if (nf) { netFocus(nf.dataset.netFocus); return; }
+  const zb = ev.target.closest("[data-zoom]"); if (zb) { const n = $("svg.net")?._net; if (n) zb.dataset.zoom === "reset" ? n.reset() : n.zoom(zb.dataset.zoom === "in" ? 1.4 : 1 / 1.4); return; }
   const sh = ev.target.closest("[data-share]"); if (sh) { SHARES.get(sh.dataset.share)?.(); return; }
   const rs = ev.target.closest("[data-restart]"); if (rs) { ev.preventDefault(); renderJouer("match"); return; }
   const pr = ev.target.closest("[data-propose]"); if (pr) { openPropose(pr.dataset.propose); return; }

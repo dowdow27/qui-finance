@@ -293,22 +293,36 @@ details.more > summary { cursor: pointer; color: var(--infl); font-weight: 500; 
 details.more[open] > summary { color: var(--muted); }
 
 /* Réseaux */
-.net-wrap { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius-l); padding: 6px; }
-svg.net { width: 100%; height: auto; max-height: 78vh; display: block; }
-svg.net line { stroke-linecap: round; }
-svg.net .l-paid { stroke: var(--money); stroke-width: 1.6; opacity: .7; }
+.net-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 14px; align-items: start; }
+.net-wrap { position: relative; background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius-l); overflow: hidden; }
+.net-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 1; }
+.net-tools .btn { padding: 4px 10px; font-size: 1.05rem; background: var(--card); }
+svg.net { width: 100%; height: 70vh; min-height: 420px; display: block; touch-action: none; cursor: grab; user-select: none; }
+svg.net:active { cursor: grabbing; }
+svg.net line { stroke-linecap: round; vector-effect: non-scaling-stroke; transition: opacity .15s; }
+svg.net .l-paid { stroke: var(--money); stroke-width: 1.6; opacity: .65; }
 svg.net .l-free { stroke: var(--muted); stroke-width: .8; opacity: .3; }
 svg.net .l-badge { stroke: var(--infl); stroke-width: 1.5; stroke-dasharray: 4 3; }
-svg.net .node { cursor: pointer; }
-svg.net .node circle { stroke: var(--card); stroke-width: 1.2; }
-svg.net .node.org circle { fill: var(--card); stroke: var(--muted); stroke-width: 1.2; }
-svg.net .node:hover circle, svg.net .node:focus-visible circle { stroke: var(--ink); stroke-width: 2; }
-svg.net text { font-size: 8.5px; fill: var(--ink); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: var(--card); stroke-width: 2.5px; }
+svg.net line.hl { opacity: 1; stroke-width: 2.2; }
+svg.net .node { cursor: pointer; transition: opacity .15s; }
+svg.net .node circle { stroke: var(--card); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+svg.net .node.org circle { fill: var(--card); stroke: var(--muted); }
+svg.net .node.center circle { stroke: var(--ink); stroke-width: 3; }
+svg.net .node:hover circle, svg.net .node:focus-visible circle, svg.net .node.hl circle { stroke: var(--ink); stroke-width: 2; }
+svg.net text { display: none; font-size: calc(9px / var(--k)); fill: var(--ink); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: var(--card); stroke-width: calc(3px / var(--k)); }
 svg.net .node.org text { font-weight: 700; }
-svg.net.sel .dim { opacity: .08; }
+svg.net .lvl1 text, svg.net[data-z="2"] .lvl2 text, svg.net[data-z="3"] text, svg.net .node.hl text { display: block; }
+svg.net.sel .dim { opacity: .07; }
+svg.net.sel .dim text { display: none; }
+.net-side { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius-l); padding: 12px 14px; max-height: 70vh; overflow-y: auto; }
+.net-side h4 { margin: 4px 0 2px; }
+.net-side .list li { padding: 6px 0; }
+.net-side button.link { text-align: left; }
+label.check { display: inline-flex; align-items: center; gap: 6px; font-size: .95rem; }
 .legend .dash { background: none; border-top: 2px dashed var(--infl); height: 0; margin-bottom: 3px; }
 .legend .org-dot { background: var(--card); border: 1px solid var(--muted); border-radius: 50%; }
 .net-card { margin-top: 12px; }
+@media (max-width: 800px) { .net-layout { grid-template-columns: 1fr; } svg.net { height: 60vh; min-height: 340px; } .net-side { max-height: none; } }
 
 /* Nouveautés */
 .week { border-top: 2px solid var(--ink); padding: 14px 0 24px; }
