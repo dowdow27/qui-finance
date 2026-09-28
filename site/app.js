@@ -719,11 +719,11 @@ function renderClassements() {
       ${bars(fr.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.taux, open: ["elu", x.e.id] })), "i", (v) => pct(v))}
       ${petits.length ? `<details class="more"><summary>Et les élus de très petits partis (${petits.length})</summary><p class="note">PEV, UDF, MCG, Lega… n'ont qu'un ou deux élus : impossible de les comparer à leur parti. Rattachés à un grand groupe, ils votent logiquement souvent autrement que lui. Votes contre la majorité de leur groupe :</p>
         <ul class="list">${petits.map((x) => `<li><span>${linkBtn("elu", x.e.id, x.e.nom)} <small class="note">${esc(x.e.parti)}</small></span><span>${nf.format(x.contre_groupe)}</span></li>`).join("")}</ul></details>` : ""}
-      ${shareBtn("frondeurs", () => shareCard({ kicker: "Les frondeurs du Conseil national", title: `${fr[0].e.nom} (${fr[0].e.parti}, ${fr[0].e.canton}) vote contre son propre parti`, big: pct(fr[0].taux), bigColor: "#1F5F8B", lines: [`des votes depuis décembre 2023 (${nf.format(fr[0].contre_parti)} votes).`, `Suivent : ${fr.slice(1, 4).map((x) => `${x.e.nom}, ${x.e.parti} (${pct(x.taux)})`).join(" ; ")}.`, ppFr.length ? `Par parti : ${ppFr.slice(0, 3).map((x) => `${x.parti} ${pct(x.moy)}`).join(", ")}.` : ""], text: "Qui vote le plus souvent contre son propre parti au Conseil national ?", file: "frondeurs.png", link: clLink("frondeurs") }))}`;
+      ${shareBtn("frondeurs", () => shareCard({ kicker: "Les frondeurs du Conseil national", title: `${fr[0].e.nom} (${fr[0].e.parti}, ${fr[0].e.canton}) vote contre son propre parti`, big: pct(fr[0].taux), bigColor: "#1F5F8B", lines: [`des votes depuis décembre 2023 (${nf.format(fr[0].contre_parti)} votes).`, `Suivent : ${fr.slice(1, 4).map((x) => `${x.e.nom}, ${x.e.parti} (${pct(x.taux)})`).join(" ; ")}.`, ppFr.length ? `Par parti : ${ppFr.slice(0, 3).map((x) => `${x.parti} ${pct(x.moy)}`).join(", ")}.` : ""], text: "Qui vote le plus souvent contre son propre parti au Conseil national ?", file: "frondeurs.png", link: clLink("frondeurs") }))}${stamp(SRC.frondeurs)}`;
     $("#cl-absents").innerHTML = `<h3><a class="anchor" href="#tendances:absents">${esc(CL.absents)}</a></h3><p class="hint">Part des votes manqués sans excuse enregistrée, législature en cours, Conseil national. Les données ne disent pas pourquoi un élu était absent.</p>
       ${partiBars(ppAb, pct)}
       ${bars(ab.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.taux, open: ["elu", x.e.id] })), "m", (v) => pctInt(v))}
-      <p><a class="btn ghost" href="#absences">Le classement complet</a></p>`;
+      <p><a class="btn ghost" href="#absences">Le classement complet</a></p>${stamp(SRC.absents)}`;
     if (location.hash === "#tendances:frondeurs" || location.hash === "#tendances:absents") $(`#cl-${location.hash.split(":")[1]}`)?.scrollIntoView({ block: "start" });
   });
 }
@@ -1033,7 +1033,7 @@ async function renderQuestion() {
     <h2 class="qs-q">${esc(q.question)}</h2>
     <div class="answers">${API ? `<button class="btn yes" data-sond="1" aria-pressed="false">Oui</button><button class="btn no" data-sond="-1" aria-pressed="false">Non</button>` : ""}
       ${q.open ? linkBtn(q.open[0], q.open[1], "Voir la fiche →") : `<a class="link" href="#tendances:${esc(q.cl)}">Voir les chiffres →</a>`}</div>
-    <div class="qs-res" id="qs-res"></div>`;
+    <div class="qs-res" id="qs-res"></div>${stamp(q.source || "CDF, Lobbywatch, Swissvotes")}`;
   if (!API) return;
   try { qsResult(await api(`/sondages/${q.id}?d=${device()}`)); } catch { /* résultats indisponibles : on peut quand même voter */ }
 }
@@ -1066,7 +1066,7 @@ function renderProchaine() {
   box.outerHTML = `<section class="card une-card prochaine"><p class="eyebrow-s">Prochaine votation · ${esc(dateFr(date))}</p><h3>Qui paie le oui et le non ?</h3>
     <ul class="list">${vs.map((v) => `<li><span>${linkBtn("vote", v.id, v.titre)}</span><span class="sub">${v.argent ? `<b class="infl">${short(v.argent.pour)} CHF pour</b> · <b class="money">${short(v.argent.contre)} CHF contre</b>` : "budget pas encore publié"}</span></li>`).join("")}</ul>
     <p class="note">${argent ? "Recettes déclarées au Contrôle fédéral des finances par les comités de campagne." : `Les comités doivent annoncer leur budget au plus tard 45 jours avant le vote (${j(45)}) ; le Contrôle fédéral des finances le publie au plus tard 15 jours avant (${j(15)}). Le site le montrera dès sa publication.`}</p>
-    <a class="go" href="#votations">Toutes les votations →</a></section>`;
+    <a class="go" href="#votations">Toutes les votations →</a>${stamp("Swissvotes, CDF")}</section>`;
 }
 
 /* ---------------- Liens d'intérêts potentiels ---------------- */
@@ -1115,7 +1115,7 @@ async function renderSpotlight() {
       <p class="spot-kpi">${e.liens.length} mandats, <b class="${paid ? "money" : ""}">${paid} rémunérés</b>${st ? `, présence aux votes ${pctInt(st.participation)}` : ""}${lp ? `, ${lp.n} lien${lp.n > 1 ? "s" : ""} d'intérêts potentiel${lp.n > 1 ? "s" : ""}` : ""}.</p>
       ${a ? `<p class="spot-art"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.titre)}</a> <small class="note">${esc(a.source)} · ${esc(dateFr(a.date))}${arts.length > 1 ? ` · et ${arts.length - 1} autre${arts.length > 2 ? "s" : ""} article${arts.length > 2 ? "s" : ""}` : ""}</small></p>` : ""}</li>`; };
   const html = (p) => `<section class="card une-card spot"><p class="eyebrow-s">${presseMode ? "Dans l'actualité" : "L'élu du jour"}</p><ul class="spot-list">${picks.map((x) => row(x, p?.elus[x[0].id])).join("")}</ul>
-    <p class="note">${presseMode ? "Élus cités par la presse ces 14 derniers jours (flux RSS), trois par jour. Le site ne commente pas l'article : il met la fiche à côté." : `Chaque jour, un élu tiré au sort parmi les ${L.elus.length}. Quand la presse cite un parlementaire, il prend la place.`}</p></section>`;
+    <p class="note">${presseMode ? "Élus cités par la presse ces 14 derniers jours (flux RSS), trois par jour. Le site ne commente pas l'article : il met la fiche à côté." : `Chaque jour, un élu tiré au sort parmi les ${L.elus.length}. Quand la presse cite un parlementaire, il prend la place.`}</p>${stamp("flux RSS des médias, Lobbywatch, Services du Parlement")}</section>`;
   box.outerHTML = html(null);
   const p = await loadParl(); if (p) { const t = document.createElement("div"); t.innerHTML = html(p); $(".spot")?.replaceWith(t.firstElementChild); }
 }
@@ -1172,7 +1172,7 @@ function clConfiance() {
   return `<h3><a class="anchor" href="#tendances:confiance">${esc(CL.confiance)}</a></h3><p class="hint">Part de oui à « Faites-vous confiance à cet élu ? », un vote par personne et par élu, élus d'au moins ${MIN_CONF} votes (${rated.length} élu${rated.length > 1 ? "s" : ""}). Ce n'est pas un sondage représentatif : ce sont les lecteurs du site.</p>
     ${partiBars(parti, (v) => `${Math.round(v)} %`, "Par parti, part de oui sur l'ensemble des votes (nombre d'élus notés entre parenthèses)")}
     ${bars(top.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "i", (v) => `${v} %`, 100)}
-    <p><a class="btn ghost" href="#chercher">Voter pour mes élus</a></p>`;
+    <p><a class="btn ghost" href="#chercher">Voter pour mes élus</a></p>${stamp(SRC.confiance)}`;
 }
 
 /* ---------------- S'engager ---------------- */
@@ -1197,12 +1197,12 @@ async function renderUne() {
   const topH = Object.entries(hosts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p]) => idx.elu.get(+p)).filter(Boolean);
   const ag = argentGagne(), lp = liensPotentiels();
   const cardA = (id, body) => `<a class="card une-card" href="#${id}">${body}</a>`;
-  const html = (abs) => cardA("absences", `<p class="eyebrow-s">Absences</p><h3>Qui manque le plus de votes au Parlement ?</h3>${abs}<span class="go">Voir le classement →</span>`)
+  const html = (abs) => cardA("absences", `<p class="eyebrow-s">Absences</p><h3>Qui manque le plus de votes au Parlement ?</h3>${abs}<span class="go">Voir le classement →</span>${stamp("Services du Parlement")}`)
     + cardA("lobbyistes", `<p class="eyebrow-s">Lobbyistes et liens d'intérêts</p><h3>${lob.length} lobbyistes entrent au Palais fédéral grâce au badge d'un élu</h3>
       ${lp.length ? `<p class="big money">${lp.length} élus</p><p class="note">siègent dans une commission et sont rémunérés par une organisation du secteur qu'elle examine, ou y font entrer un lobbyiste. Un lien n'est pas une faute : c'est une information.</p>
       <ol class="podium">${lp.slice(0, 3).map((r) => `<li><span>${esc(r.e.nom)} <small>(${esc(r.e.parti)})</small><span class="ctx">${lpLine(r.hits[0])}</span></span><b class="money">${r.n}</b></li>`).join("")}</ol>` : `<p class="note">Parmi ceux qui en font entrer : ${topH.map((e) => esc(e.nom)).join(", ")}…</p>`}
-      <span class="go">Qui fait entrer qui →</span>`)
-    + (ag.rows.length ? cardA("tendances", `<p class="eyebrow-s">Votations</p><h3>L'argent gagne-t-il ?</h3><p class="big money">${ag.n} sur ${ag.rows.length}</p><p class="note">votations gagnées par le camp qui a dépensé le plus</p><span class="go">Tous les classements →</span>`) : "");
+      <span class="go">Qui fait entrer qui →</span>${stamp("Lobbywatch")}`)
+    + (ag.rows.length ? cardA("tendances", `<p class="eyebrow-s">Votations</p><h3>L'argent gagne-t-il ?</h3><p class="big money">${ag.n} sur ${ag.rows.length}</p><p class="note">votations gagnées par le camp qui a dépensé le plus</p><span class="go">Tous les classements →</span>${stamp("CDF, Swissvotes")}`) : "");
   box.innerHTML = html(`<p class="note">Chargement…</p>`);
   const p = await loadParl(); if (!p) return;
   const t = L.elus.filter((e) => e.conseil === "CN" && p.elus[e.id]).map((e) => ({ e, taux: 100 * p.elus[e.id].absences / p.elus[e.id].scrutins })).sort((a, b) => b.taux - a.taux).slice(0, 3);
@@ -1622,7 +1622,9 @@ function renderTrends() {
   cards.push(card("Évolution semaine après semaine", "Un point par mise à jour automatique.", timeline(), true));
   $("#charts").innerHTML = cards.join("");
 }
-function card(title, hint, body, wide, id) { return `<div class="card${wide ? " wide" : ""}"${id ? ` id="cl-${esc(id)}"` : ""}><h3>${id ? `<a class="anchor" href="#tendances:${esc(id)}" title="Lien vers ce classement">${esc(title)}</a>` : esc(title)}</h3>${hint ? `<p class="hint">${esc(hint)}</p>` : ""}${body}</div>`; }
+const stamp = (src) => (src ? `<p class="stamp">Source : ${esc(src)}</p>` : "");
+const SRC = { partis: "CDF, Lobbywatch", "argent-gagne": "CDF, Swissvotes", "cout-voix": "CDF, Swissvotes, OFS", "multi-partis": "CDF", cumul: "Lobbywatch", nouveaux: "Lobbywatch", badges: "Lobbywatch", liens: "Lobbywatch", confiance: "lecteurs du site", frondeurs: "Services du Parlement", absents: "Services du Parlement" };
+function card(title, hint, body, wide, id) { return `<div class="card${wide ? " wide" : ""}"${id ? ` id="cl-${esc(id)}"` : ""}><h3>${id ? `<a class="anchor" href="#tendances:${esc(id)}" title="Lien vers ce classement">${esc(title)}</a>` : esc(title)}</h3>${hint ? `<p class="hint">${esc(hint)}</p>` : ""}${body}${stamp(SRC[id])}</div>`; }
 function timeline() {
   const pts = T.filter((r) => r.mandats_n !== "" || r.dons_n !== "");
   if (pts.length < 2) return `<p class="note">La courbe se remplira à partir de la deuxième mise à jour hebdomadaire.</p>`;

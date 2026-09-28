@@ -41,6 +41,9 @@ jobs:
           git pull --rebase -X theirs origin main
           git push
 
+      - name: Versionner style.css et app.js (cache des navigateurs)
+        run: sed -i "s/style.css?v=dev/style.css?v=${GITHUB_SHA::7}/; s/app.js?v=dev/app.js?v=${GITHUB_SHA::7}/" site/index.html
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
