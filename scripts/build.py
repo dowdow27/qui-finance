@@ -562,6 +562,7 @@ def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commission
     membres = [[int(pn), m["nom"], m["groupe"], m["canton"], by_pn[pn]["id"] if pn in by_pn else None]
                for pn, m in ((pn, cache["membres"][pn]) for pn in pns)]
     groupe = {pn: cache["membres"][pn]["groupe"] for pn in pns}
+    parti = {pn: by_pn[pn]["parti"] for pn in pns if pn in by_pn}  # parti actuel (Lobbywatch), élus en fonction seulement
     # Groupes d'intérêts Lobbywatch (plus fins que les secteurs) : élus ayant au moins un mandat en cours dedans
     elu_pn = {e["id"]: str(e["pn"]) for e in elus if e.get("pn")}
     interets, secteur_de = defaultdict(set), {}
@@ -574,7 +575,8 @@ def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commission
 
     ids = sorted(cache["scrutins"], key=int, reverse=True)
     scrutins, ecarts = [], defaultdict(list)
-    stats = defaultdict(lambda: {"vote": 0, "total": 0, "absent": 0, "excuse": 0, "contre": 0, "recents": []})
+    stats = defaultdict(lambda: {"vote": 0, "total": 0, "absent": 0, "excuse": 0, "contre": 0, "recents": [],
+                                 "contre_parti": 0, "compare_parti": 0, "recents_parti": []})
     testes = defaultdict(int)
     for vid in ids:
         s = cache["scrutins"][vid]
@@ -582,12 +584,14 @@ def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commission
         votes = {pn: c for pn, c in zip(pns, code) if c != " "}
         scrutins.append([int(vid), s["date"], s["objet"], s["titre"], s["affaire"] if s["affaire"] != s["titre"] else "",
                          s["sujet"], s["oui"], s["non"], code])
-        gy, gn = defaultdict(int), defaultdict(int)
+        gy, gn, py, pno = defaultdict(int), defaultdict(int), defaultdict(int), defaultdict(int)
         for pn, d in votes.items():
             if d == "o":
                 gy[groupe[pn]] += 1
+                py[parti.get(pn)] += 1
             elif d == "n":
                 gn[groupe[pn]] += 1
+                pno[parti.get(pn)] += 1
         for pn, d in votes.items():
             if d in (" ", "p"):
                 continue
@@ -606,6 +610,16 @@ def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commission
                     st["contre"] += 1
                     if len(st["recents"]) < 10:
                         st["recents"].append(int(vid))
+            # Contre son propre parti : majorité des AUTRES élus du même parti (au moins 2 votants oui/non)
+            pt = parti.get(pn)
+            if pt and d in "on":
+                oy, on = py[pt] - (d == "o"), pno[pt] - (d == "n")
+                if oy + on >= 2 and oy != on:
+                    st["compare_parti"] += 1
+                    if d != ("o" if oy > on else "n"):
+                        st["contre_parti"] += 1
+                        if len(st["recents_parti"]) < 10:
+                            st["recents_parti"].append(int(vid))
         # Écart des élus d'un groupe d'intérêts par rapport à ce qu'ont voté leurs groupes parlementaires,
         # seulement sur les objets examinés par la commission de leur branche (sinon on mesure du bruit)
         coms = set(com_objet.get(s["objet"], []))
@@ -637,7 +651,9 @@ def build_parlement(cache: dict, elus: list[dict], liens: list[dict], commission
                "scrutins": sorted(ecarts[g], key=lambda x: -abs(x[5]))[:25]} for g in interets if testes[g]}
     elus_stats = {by_pn[pn]["id"]: {"participation": round(100 * st["vote"] / st["total"], 1) if st["total"] else None,
                                     "scrutins": st["total"], "absences": st["absent"], "excuses": st["excuse"],
-                                    "contre_groupe": st["contre"], "recents": st["recents"]}
+                                    "contre_groupe": st["contre"], "recents": st["recents"],
+                                    "contre_parti": st["contre_parti"], "compare_parti": st["compare_parti"],
+                                    "recents_parti": st["recents_parti"]}
                   for pn, st in stats.items() if pn in by_pn}
     return {"legislature": LEGISLATURE, "membres": membres, "scrutins": scrutins, "elus": elus_stats, "interets": top,
             "interets_membres": {g: sorted(int(pn) for pn in m) for g, m in interets.items()}}
