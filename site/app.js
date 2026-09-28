@@ -49,9 +49,10 @@ function buildIndexes() {
 }
 
 /* ---------------- Navigation ---------------- */
-const TABS = ["chercher", "jouer", "absences", "lobbyistes", "dons", "votations", "parlement", "tendances", "debats", "nouveautes"];
+const TABS = ["chercher", "jouer", "absences", "lobbyistes", "reseaux", "dons", "votations", "parlement", "tendances", "debats", "nouveautes"];
 function route() {
-  const [tab, q] = decodeURIComponent(location.hash.slice(1)).split(":");
+  const [tab, ...qs] = decodeURIComponent(location.hash.slice(1)).split(":");
+  const q = qs.length ? qs.join(":") : undefined;
   const t = TABS.includes(tab) ? tab : "chercher";
   for (const x of TABS) $(`#tab-${x}`).hidden = x !== t;
   document.querySelectorAll(".tabs a").forEach((a) => (a.dataset.tab === t ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
@@ -61,6 +62,7 @@ function route() {
   if (t === "jouer") renderJouer(q);
   if (t === "absences") renderAbsences();
   if (t === "lobbyistes") renderLobbyistes();
+  if (t === "reseaux") renderReseaux(q);
   if (t === "debats") renderDebats();
   if (t === "parlement") renderParlVotes();
 }
@@ -170,7 +172,7 @@ function sheetElu(e) {
      <span class="sub">${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}. ${esc(l.secteur)}${l.principal ? ". Activité principale" : ""}</span></li>`), 8, "mandats") : `<p class="note">Aucun mandat déclaré.</p>`}</section>
   ${e.conseil === "CN" ? `<section><h3>Votes au Conseil national</h3><div id="elu-votes"><p class="note">Chargement…</p></div></section>` : ""}
   ${e.badges.length ? `<section><h3>Badges d'accès donnés</h3><ul class="list">${e.badges.map((b) => `<li><span>${esc(b.nom)}</span><span class="tag ${badgeType(b) === "Lobbyiste" ? "paid" : ""}">${esc(badgeType(b))}</span><span class="sub">${esc(trBadge(b.fonction))} ${deHint(b.fonction)}${b.mandats.length ? ". " + esc(b.mandats.join(", ")) : ""}</span></li>`).join("")}</ul></section>` : ""}
-  <p>${e.parlement ? `<a href="${esc(e.parlement)}" target="_blank" rel="noopener">Fiche officielle sur parlament.ch</a> · ` : ""}<a href="${esc(e.url)}" target="_blank" rel="noopener">Fiche complète sur Lobbywatch</a></p>`;
+  <p><a href="#reseaux:elu|${e.id}" data-close>Voir son réseau</a> · ${e.parlement ? `<a href="${esc(e.parlement)}" target="_blank" rel="noopener">Fiche officielle sur parlament.ch</a> · ` : ""}<a href="${esc(e.url)}" target="_blank" rel="noopener">Fiche complète sur Lobbywatch</a></p>`;
 }
 function sheetOrg(o) {
   if (!o) return "";
@@ -178,6 +180,7 @@ function sheetOrg(o) {
   return `<h2>${esc(o.nom)}</h2><p class="note">${deHint(o.nom)} ${esc(o.groupe)}. ${esc(o.secteur)}</p>
   <div class="kpis">${kpi(uniq(o.liens.map((l) => l.p)).length, "élus liés", "infl")}${kpi(o.liens.filter((l) => l.statut === "remunere").length, "mandats rémunérés")}${donor ? kpi(chf(donor.total), "dons déclarés", "money") : ""}</div>
   <section><h3>Parlementaires liés</h3>${listMore(o.liens.map((l) => { const e = idx.elu.get(l.p); return e ? `<li><span>${linkBtn("elu", e.id, e.nom)}</span><span class="tag ${l.statut === "remunere" ? "paid" : ""}">${l.montant ? chf(l.montant) : STATUT[l.statut]}</span><span class="sub">${esc(e.parti)}, ${esc(e.canton)}. ${esc(ROLE[l.role] || l.role)}${l.fonction ? ", " + esc(FUNC[l.fonction] || l.fonction) : ""}</span></li>` : ""; }).filter(Boolean), 10, "parlementaires")}</section>
+  <p><a href="#reseaux:org|${esc(o.nom)}" data-close>Voir son réseau</a></p>
   ${donor ? `<section><h3>Dons de cette organisation</h3>${donList(donor.dons, "recip")}</section>` : ""}`;
 }
 
@@ -949,6 +952,142 @@ async function renderUne() {
   box.innerHTML = html(`<ol class="podium">${t.map((r) => `<li><span>${esc(r.e.nom)} <small>(${esc(r.e.parti)})</small>${ctxNote(r.e)}</span><b class="money">${pctInt(r.taux)}</b></li>`).join("")}</ol><p class="note">des votes manqués sans excuse, depuis décembre 2023</p>`);
 }
 
+/* ---------------- Réseaux (carte à bulles élus × organisations) ---------------- */
+const F_COLORS = { G: "#6FA83A", S: "#D93A3A", GL: "#B3AE1F", ME: "#EF8C00", RL: "#2F6DB3", V: "#1F6B35", X: "#9AA4AE" };  // pour l'image partagée (thème clair)
+let NET = null;  // dernière carte calculée (pour l'image partagée)
+
+function netData(mode, key) {
+  const nodes = new Map(), links = [];
+  const addElu = (e) => { if (!nodes.has(`e:${e.id}`)) nodes.set(`e:${e.id}`, { id: `e:${e.id}`, type: "elu", e, label: e.nom, paid: e.liens.filter((l) => l.statut === "remunere").length }); return nodes.get(`e:${e.id}`); };
+  const addOrg = (o) => { if (!nodes.has(`o:${o}`)) nodes.set(`o:${o}`, { id: `o:${o}`, type: "org", label: o, n: 0 }); return nodes.get(`o:${o}`); };
+  const link = (e, l) => { const a = addElu(e), b = addOrg(l.org); b.n++; links.push({ s: a.id, t: b.id, paid: l.statut === "remunere", lien: l }); };
+  let titre = "", orgsSel;
+  if (mode === "g") {
+    const ls = L.liens.filter((l) => l.groupe === key);
+    const byOrg = {}; ls.forEach((l) => { (byOrg[l.org] ||= new Set()).add(l.p); });
+    orgsSel = new Set(Object.entries(byOrg).sort((a, b) => b[1].size - a[1].size).slice(0, 45).map(([o]) => o));
+    ls.filter((l) => orgsSel.has(l.org)).forEach((l) => { const e = idx.elu.get(l.p); if (e) link(e, l); });
+    titre = `Groupe d'intérêts : ${key}`;
+  } else if (mode === "elu") {
+    const c = idx.elu.get(+key); if (!c) return null;
+    c.liens.slice(0, 40).forEach((l) => link(c, l));
+    const orgs = new Set(c.liens.slice(0, 40).map((l) => l.org)), voisins = {};
+    L.liens.forEach((l) => { if (l.p !== c.id && orgs.has(l.org)) (voisins[l.p] ||= []).push(l); });
+    Object.entries(voisins).sort((a, b) => b[1].length - a[1].length).slice(0, 22).forEach(([p, ls]) => { const e = idx.elu.get(+p); if (e) ls.forEach((l) => link(e, l)); });
+    titre = `Le réseau de ${c.nom}`;
+  } else if (mode === "org") {
+    const o = idx.org.get(key); if (!o) return null;
+    const elus = uniq(o.liens.map((l) => l.p)).map((p) => idx.elu.get(p)).filter(Boolean);
+    o.liens.forEach((l) => { const e = idx.elu.get(l.p); if (e) link(e, l); });
+    const autres = {}; elus.forEach((e) => e.liens.forEach((l) => { if (l.org !== key) (autres[l.org] ||= []).push([e, l]); }));
+    Object.entries(autres).filter(([, v]) => v.length >= 2).sort((a, b) => b[1].length - a[1].length).slice(0, 30).forEach(([, v]) => v.forEach(([e, l]) => link(e, l)));
+    titre = `Autour de ${key}`;
+  }
+  // Badges : un élu qui fait entrer un lobbyiste d'une organisation présente sur la carte
+  const badges = [];
+  L.badges.filter(isLobbyiste).forEach((b) => { const org = orgBadge(b), e = idx.elu.get(b.p);
+    if (e && nodes.has(`e:${e.id}`) && nodes.has(`o:${org}`)) badges.push({ s: `e:${e.id}`, t: `o:${org}`, badge: b }); });
+  return { titre, nodes: [...nodes.values()], links, badges };
+}
+
+function layout(net) {
+  const N = net.nodes, byId = new Map(N.map((n) => [n.id, n]));
+  N.forEach((n, i) => { n.r = n.type === "elu" ? 7 + Math.min(10, n.paid * 0.8) : 5 + Math.min(16, n.n * 2.2); const a = i * 2.39996; n.x = Math.cos(a) * 12 * Math.sqrt(i + 1); n.y = Math.sin(a) * 12 * Math.sqrt(i + 1); n.vx = 0; n.vy = 0; });
+  const E = net.links.concat(net.badges).map((l) => ({ a: byId.get(l.s), b: byId.get(l.t), k: l.badge ? 0.02 : l.paid ? 0.06 : 0.04 }));
+  const REP = 900 + 30 * N.length, REST = 26 + N.length / 3;  // cartes chargées : bulles plus espacées
+  for (let it = 0; it < 320; it++) {
+    const alpha = 1 - it / 320;
+    for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) {  // répulsion + collision
+      const a = N[i], b = N[j]; let dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy || 0.01, d = Math.sqrt(d2);
+      let f = REP / d2; const min = a.r + b.r + 4; if (d < min) f += (min - d) * 0.5;
+      dx /= d; dy /= d; a.vx -= dx * f; a.vy -= dy * f; b.vx += dx * f; b.vy += dy * f;
+    }
+    for (const { a, b, k } of E) {  // ressorts
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 0.01, rest = a.r + b.r + REST, f = (d - rest) * k;
+      a.vx += dx / d * f; a.vy += dy / d * f; b.vx -= dx / d * f; b.vy -= dy / d * f;
+    }
+    for (const n of N) { n.vx -= n.x * 0.004; n.vy -= n.y * 0.004; n.x += n.vx * alpha * 0.6; n.y += n.vy * alpha * 0.6; n.vx *= 0.55; n.vy *= 0.55; }
+  }
+  const xs = N.flatMap((n) => [n.x - n.r, n.x + n.r]), ys = N.flatMap((n) => [n.y - n.r, n.y + n.r]);
+  net.box = [Math.min(...xs) - 20, Math.min(...ys) - 20, Math.max(...xs) - Math.min(...xs) + 40, Math.max(...ys) - Math.min(...ys) + 40];
+  net.E = E; net.byId = byId;
+  return net;
+}
+
+function renderReseaux(q) {
+  const box = $("#net"); if (!box) return;
+  const groupes = uniq(L.liens.map((l) => l.groupe)).filter((g) => g !== "Non classé" && g !== "Partis").sort((a, b) => a.localeCompare(b));
+  const [mode, ...rest] = (q || "").split("|"), key = rest.join("|");
+  const m = ["g", "elu", "org"].includes(mode) && key ? mode : "g", k = m === "g" && !groupes.includes(key) ? (groupes.includes("Assurances") ? "Assurances" : groupes[0]) : key;
+  $("#f-net").innerHTML = `<select id="fn-groupe" aria-label="Groupe d'intérêts">${groupes.map((g) => `<option${m === "g" && g === k ? " selected" : ""}>${esc(g)}</option>`).join("")}</select>
+    <input type="search" id="fn-q" list="fn-list" placeholder="Ou un élu, une organisation…" aria-label="Centrer sur un élu ou une organisation"><datalist id="fn-list"></datalist>`;
+  const net = netData(m, k);
+  if (!net || !net.nodes.length) { box.innerHTML = `<p class="empty">Rien à afficher.</p>`; return; }
+  NET = layout(net);
+  const [x0, y0, w, h] = NET.box;
+  const lines = NET.links.map((l) => { const a = NET.byId.get(l.s), b = NET.byId.get(l.t); return `<line data-s="${esc(l.s)}" data-t="${esc(l.t)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="${l.paid ? "l-paid" : "l-free"}"><title>${esc(a.label)} → ${esc(b.label)} : ${esc(ROLE[l.lien.role] || l.lien.role)}${l.paid ? ", rémunéré" : ""}</title></line>`; }).join("")
+    + NET.badges.map((l) => { const a = NET.byId.get(l.s), b = NET.byId.get(l.t); return `<line data-s="${esc(l.s)}" data-t="${esc(l.t)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="l-badge"><title>${esc(a.label)} fait entrer ${esc(l.badge.nom)} (${esc(b.label)}) au Palais fédéral</title></line>`; }).join("");
+  const circles = NET.nodes.map((n) => {
+    const lbl = n.type === "elu" ? n.label.split(" ").slice(-1)[0] : (n.n >= 3 || NET.nodes.length <= 70) ? (n.label.length > 22 ? n.label.slice(0, 20) + "…" : n.label) : "";
+    return `<g class="node ${n.type}" data-id="${esc(n.id)}" data-net="${n.type === "elu" ? `elu|${n.e.id}` : `org|${esc(n.label)}`}" tabindex="0" role="button" aria-label="${esc(n.label)}">
+      <circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.r.toFixed(1)}" ${n.type === "elu" ? `fill="var(--f-${fcls(n.e.fraction)})"` : ""}><title>${esc(n.label)}${n.type === "elu" ? ` (${esc(n.e.parti)}, ${esc(n.e.canton)}) : ${n.paid} mandats rémunérés` : ` : ${n.n} élu${n.n > 1 ? "s" : ""} sur cette carte`}</title></circle>
+      ${lbl ? `<text x="${n.x.toFixed(1)}" y="${(n.y + n.r + 10).toFixed(1)}">${esc(lbl)}</text>` : ""}</g>`; }).join("");
+  const nElus = NET.nodes.filter((n) => n.type === "elu").length, nOrgs = NET.nodes.length - nElus;
+  box.innerHTML = `<p class="summary">${esc(NET.titre)} · <span class="infl">${nElus} élus</span>, ${nOrgs} organisations, ${NET.links.filter((l) => l.paid).length} mandats rémunérés${NET.badges.length ? `, ${NET.badges.length} badge${NET.badges.length > 1 ? "s" : ""} de lobbyiste` : ""}</p>
+    <div class="net-wrap"><svg class="net" viewBox="${x0.toFixed(0)} ${y0.toFixed(0)} ${w.toFixed(0)} ${h.toFixed(0)}" role="img" aria-label="${esc(NET.titre)}">${lines}${circles}</svg></div>
+    <div class="legend wrap-l"><span><i style="background:var(--money)"></i>mandat rémunéré</span><span><i style="background:var(--rule)"></i>mandat bénévole ou non communiqué</span><span><i class="dash"></i>badge d'accès donné à un lobbyiste</span><span><i class="org-dot"></i>organisation</span><span>bulle colorée : élu (couleur du groupe)</span></div>
+    <p class="note">Cliquez une bulle pour recentrer la carte sur elle. Taille : mandats rémunérés (élus) ou nombre d'élus liés (organisations). Un lien n'est pas une faute : c'est une information.</p>
+    <div id="net-info"></div>
+    ${shareBtn("reseau", shareNet)}`;
+  $("#fn-groupe").addEventListener("change", (ev) => { location.hash = `#reseaux:g|${ev.target.value}`; });
+  $("#fn-q").addEventListener("input", (ev) => {
+    const t = norm(ev.target.value).split(" ").filter(Boolean); if (!t.length) return;
+    const hits = [...L.elus.filter((e) => matchAll(e._n, t)).slice(0, 5).map((e) => [e.nom, `elu|${e.id}`]), ...[...idx.org.values()].filter((o) => matchAll(o._n, t)).slice(0, 5).map((o) => [o.nom, `org|${o.nom}`])];
+    $("#fn-list").innerHTML = hits.map(([l]) => `<option value="${esc(l)}">`).join("");
+    const exact = hits.find(([l]) => l === ev.target.value); if (exact) location.hash = `#reseaux:${exact[1]}`;
+  });
+}
+function netInfo(ref) {
+  const [type, ...rest] = ref.split("|"), key = rest.join("|");
+  const e = type === "elu" ? idx.elu.get(+key) : null, o = type === "org" ? idx.org.get(key) : null;
+  $("#net-info").innerHTML = `<div class="card net-card"><strong>${esc(e ? e.nom : key)}</strong> <small class="note">${e ? `${esc(e.parti)}, ${esc(e.canton)} · ${e.liens.length} mandats` : o ? `${esc(o.groupe)} · ${uniq(o.liens.map((l) => l.p)).length} élus liés` : ""}</small>
+    <div class="answers"><a class="btn" href="#reseaux:${esc(ref)}">Recentrer la carte</a>${linkBtn(e ? "elu" : "org", e ? e.id : key, "Ouvrir la fiche")}</div></div>`;
+}
+async function shareNet() {
+  if (!NET) return;
+  await document.fonts?.ready;
+  const W = 1080, H = 1350, c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
+  const Fnt = (w, s) => `${w} ${s}px "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif`;
+  x.fillStyle = "#F3F4F1"; x.fillRect(0, 0, W, H); x.fillStyle = "#C8202A"; x.fillRect(0, 0, W / 2, 20); x.fillStyle = "#1F5F8B"; x.fillRect(W / 2, 0, W / 2, 20);
+  x.fillStyle = "#5F6873"; x.font = Fnt(700, 32); x.fillText("QUI FINANCE ? · RÉSEAUX", 60, 100);
+  x.fillStyle = "#16202A"; x.font = Fnt(800, 54); let y = 170; for (const l of wrapLines(x, NET.titre, W - 120).slice(0, 2)) { x.fillText(l, 60, y); y += 62; }
+  const [x0, y0, w, h] = NET.box, top = y + 10, area = [60, top, W - 120, H - top - 170], s = Math.min(area[2] / w, area[3] / h);
+  const P = (n) => [area[0] + (n.x - x0) * s + (area[2] - w * s) / 2, area[1] + (n.y - y0) * s + (area[3] - h * s) / 2];
+  for (const l of NET.links) { const [ax, ay] = P(NET.byId.get(l.s)), [bx, by] = P(NET.byId.get(l.t)); x.strokeStyle = l.paid ? "rgba(200,32,42,.75)" : "rgba(95,104,115,.3)"; x.lineWidth = l.paid ? 2.5 : 1.2; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); }
+  x.setLineDash([6, 5]); for (const l of NET.badges) { const [ax, ay] = P(NET.byId.get(l.s)), [bx, by] = P(NET.byId.get(l.t)); x.strokeStyle = "#1F5F8B"; x.lineWidth = 2; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); } x.setLineDash([]);
+  x.textAlign = "center";
+  for (const n of NET.nodes) { const [nx, ny] = P(n), r = Math.max(4, n.r * s);
+    x.beginPath(); x.arc(nx, ny, r, 0, 2 * Math.PI); x.fillStyle = n.type === "elu" ? F_COLORS[fcls(n.e.fraction)] : "#FFFFFF"; x.fill(); x.strokeStyle = n.type === "elu" ? "#FFFFFF" : "#5F6873"; x.lineWidth = 1.5; x.stroke();
+    const lbl = n.type === "elu" ? n.label.split(" ").slice(-1)[0] : n.n >= 3 ? n.label.slice(0, 24) : "";
+    if (lbl) { x.fillStyle = "#16202A"; x.font = Fnt(n.type === "elu" ? 500 : 700, 20); x.fillText(lbl, nx, ny + r + 20); } }
+  x.textAlign = "left"; x.fillStyle = "#5F6873"; x.font = Fnt(500, 28);
+  x.fillText("Rouge : mandat rémunéré · pointillé : badge de lobbyiste · couleur : groupe", 60, H - 120);
+  x.font = Fnt(500, 30); x.fillText(SITE_URL.replace(/^https?:\/\//, ""), 60, H - 70);
+  const blob = await new Promise((r) => c.toBlob(r, "image/png")), f = new File([blob], "reseau.png", { type: "image/png" }), msg = `${NET.titre} : qui est lié à qui au Parlement ? ${SITE_URL}`;
+  if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f], text: msg }); return; } catch (e) { if (e.name === "AbortError") return; } }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "reseau.png"; a.click(); navigator.clipboard?.writeText(msg).catch(() => {});
+}
+
+function netSelect(ref) {
+  netInfo(ref);
+  const [type, ...rest] = ref.split("|"), id = type === "elu" ? `e:${rest[0]}` : `o:${rest.join("|")}`;
+  const svg = $("svg.net"); if (!svg) return;
+  const near = new Set([id]);
+  svg.querySelectorAll("line").forEach((l) => { const on = l.dataset.s === id || l.dataset.t === id; l.classList.toggle("dim", !on); if (on) { near.add(l.dataset.s); near.add(l.dataset.t); } });
+  svg.querySelectorAll(".node").forEach((g) => g.classList.toggle("dim", !near.has(g.dataset.id)));
+  svg.classList.add("sel");
+}
+
 /* ---------------- Débats ---------------- */
 const { API = "", TS_KEY = "" } = window.QF || {};
 const DEBAT_TYPES = new Set(["donor", "recip", "elu", "org", "vote", "scrutin", "cantonal"]);
@@ -1181,6 +1320,7 @@ document.addEventListener("click", (ev) => {
   if (ev.target.closest("[data-close]")) { closeSheet(); return; }
   const q = ev.target.closest("[data-q]"); if (q) { $("#q").value = q.dataset.q; search(); return; }
   const dq = ev.target.closest("[data-dons-q]"); if (dq) { location.hash = "#dons"; $("#fd-q").value = dq.dataset.donsQ; renderDons(); return; }
+  const nn = ev.target.closest("[data-net]"); if (nn) { netSelect(nn.dataset.net); return; }
   const sh = ev.target.closest("[data-share]"); if (sh) { SHARES.get(sh.dataset.share)?.(); return; }
   const rs = ev.target.closest("[data-restart]"); if (rs) { ev.preventDefault(); renderJouer("match"); return; }
   const pr = ev.target.closest("[data-propose]"); if (pr) { openPropose(pr.dataset.propose); return; }
@@ -1190,7 +1330,7 @@ document.addEventListener("click", (ev) => {
   const dr = ev.target.closest("[data-delref]"); if (dr) { PROP.splice(+dr.dataset.delref, 1); renderPropRefs(); return; }
   const s = ev.target.closest("[data-sort]"); if (s) { const [t, k] = s.dataset.sort.split(":"); const st = state[t]; st.dir = st.sort === k ? -st.dir : -1; st.sort = k; st.page = 0; (t === "dons" ? renderDons : renderParl)(); }
 });
-document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeSheet(); });
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeSheet(); if (ev.key === "Enter" && ev.target.dataset?.net) netSelect(ev.target.dataset.net); });
 document.addEventListener("submit", (ev) => {
   if (ev.target.id === "f-propose") { ev.preventDefault(); submitPropose(ev.target); }
   else if (ev.target.classList.contains("f-com")) { ev.preventDefault(); submitCom(ev.target); }
