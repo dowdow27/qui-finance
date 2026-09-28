@@ -66,6 +66,9 @@ a { color: var(--infl); }
 /* Filtres : un choix visible, pas un détail */
 #tab-dons .filters, #tab-votations .filters, #tab-parlement .filters, #tab-reseaux .filters, #tab-absences .filters, #tab-lobbyistes .filters, #tab-tendances .filters { align-items: center; padding: 10px 12px; border-radius: var(--radius-s); background: var(--card); border: 1px dashed var(--infl); }
 #tab-dons .filters::before, #tab-votations .filters::before, #tab-parlement .filters::before, #tab-reseaux .filters::before, #tab-absences .filters::before, #tab-lobbyistes .filters::before, #tab-tendances .filters::before { content: "Filtrer"; font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--infl); }
+.filters[hidden] { display: none; }
+#tab-votations .filters.level { border: 0; padding: 0; margin-bottom: 8px; }
+#tab-votations .filters.level::before { content: "Niveau"; }
 #tab-dons .filters select, #tab-votations .filters select, #tab-parlement .filters select, #tab-reseaux .filters select, #tab-absences .filters select, #tab-lobbyistes .filters select, #tab-tendances .filters select { border: 2px solid var(--infl); font-weight: 500; }
 
 /* Accueil */
