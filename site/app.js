@@ -1676,8 +1676,11 @@ document.addEventListener("click", (ev) => {
   const cm = ev.target.closest("[data-com]"); if (cm) { toggleComs(cm); return; }
   const ar = ev.target.closest("[data-addref]"); if (ar) { const r = refFromKey(ar.dataset.addref); if (r && PROP.length < 6 && !PROP.some((x) => x.type === r.type && x.key === r.key)) PROP.push(r); renderPropRefs(); $("#p-ref-q").value = ""; $("#p-ref-res").innerHTML = ""; $("#p-ref-q").focus(); return; }
   const dr = ev.target.closest("[data-delref]"); if (dr) { PROP.splice(+dr.dataset.delref, 1); renderPropRefs(); return; }
-  const s = ev.target.closest("[data-sort]"); if (s) { const [t, k] = s.dataset.sort.split(":"); const st = state[t]; st.dir = st.sort === k ? -st.dir : -1; st.sort = k; st.page = 0; (t === "dons" ? renderDons : renderParl)(); }
+  const s = ev.target.closest("[data-sort]"); if (s) { const [t, k] = s.dataset.sort.split(":"); const st = state[t]; st.dir = st.sort === k ? -st.dir : -1; st.sort = k; st.page = 0; (t === "dons" ? renderDons : renderParl)(); return; }
+  const a = ev.target.closest('a[href^="#"]');  // navigation interne : pushState plutôt que hashchange, pour que la mesure d'audience (Cloudflare) compte chaque onglet
+  if (a && !ev.defaultPrevented && !ev.metaKey && !ev.ctrlKey && a.getAttribute("href").length > 1) { ev.preventDefault(); if (a.getAttribute("href") !== location.hash) history.pushState(null, "", a.getAttribute("href")); route(); }
 });
+window.addEventListener("popstate", route);
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeSheet(); if (ev.key === "Enter" && ev.target.dataset?.net) netSelect(ev.target.dataset.net); });
 document.addEventListener("submit", (ev) => {
   if (ev.target.id === "f-propose") { ev.preventDefault(); submitPropose(ev.target); }
@@ -1699,5 +1702,9 @@ document.addEventListener("input", (ev) => {
   $("#fdb-tri").addEventListener("input", renderDebats);
   if (!API) $('.tabs a[data-tab="debats"]').hidden = true;  // onglet masqué tant que l'API n'est pas configurée (site/config.js)
   let timer; $("#q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(search, 120); });
-  window.addEventListener("hashchange", route); route();
+  route();  // popstate couvre le bouton retour et le hash tapé à la main ; hashchange doublerait l'appel
+  if (window.QF?.CF_TOKEN) {  // Cloudflare Web Analytics : sans cookie, sans donnée personnelle, compte les pages vues (spa : chaque onglet)
+    const b = document.createElement("script"); b.defer = true; b.src = "https://static.cloudflareinsights.com/beacon.min.js";
+    b.dataset.cfBeacon = JSON.stringify({ token: window.QF.CF_TOKEN, spa: true }); document.head.append(b);
+  }
 })();
