@@ -579,16 +579,19 @@ async function shareCard({ kicker = "Qui finance ?", title, big, bigColor = "#C8
   await document.fonts?.ready;
   const W = 1080, H = 1350, c = document.createElement("canvas"); c.width = W; c.height = H;
   const x = c.getContext("2d"), F = (w, s) => `${w} ${s}px "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif`;
-  x.fillStyle = "#F3F4F1"; x.fillRect(0, 0, W, H);
-  x.fillStyle = "#C8202A"; x.fillRect(0, 0, W / 2, 20); x.fillStyle = "#1F5F8B"; x.fillRect(W / 2, 0, W / 2, 20);
-  let y = 130; x.fillStyle = "#5F6873"; x.font = F(700, 32); x.fillText(`${kicker}`.toUpperCase(), 80, y);
-  y += 95; x.fillStyle = "#16202A"; x.font = F(800, 66);
-  for (const l of wrapLines(x, title, W - 160).slice(0, 5)) { x.fillText(l, 80, y); y += 78; }
-  if (big) { x.fillStyle = bigColor; x.font = F(800, big.length > 9 ? 110 : 160); y += 150; x.fillText(big, 80, y); y += 40; }
-  x.fillStyle = "#16202A"; x.font = F(500, 40);
-  for (const line of lines) for (const l of wrapLines(x, line, W - 160)) { y += 60; if (y > H - 150) break; x.fillText(l, 80, y); }
-  x.fillStyle = "#5F6873"; x.font = F(700, 30); x.fillText("TRANSPARENCE DÉMOCRATIQUE", 80, H - 120);
-  x.font = F(500, 32); x.fillText(SITE_URL.replace(/^https?:\/\//, ""), 80, H - 70);
+  // Direction « Affiche » : blanc, filet noir, carré rouge devant le kicker, chiffre en titre, filet de pied
+  x.fillStyle = "#FFFFFF"; x.fillRect(0, 0, W, H);
+  x.fillStyle = "#111111"; x.fillRect(80, 96, W - 160, 3);
+  let y = 160; x.fillStyle = "#DA291C"; x.fillRect(80, y - 24, 24, 24);
+  x.fillStyle = "#111111"; x.font = F(700, 30); x.letterSpacing = "4px"; x.fillText(`${kicker}`.toUpperCase(), 122, y); x.letterSpacing = "0px";
+  y += 100; x.font = F(800, 66);
+  for (const l of wrapLines(x, title, W - 160).slice(0, 5)) { x.fillText(l, 80, y); y += 76; }
+  if (big) { x.fillStyle = bigColor === "#16202A" ? "#111111" : bigColor; x.font = F(800, big.length > 9 ? 120 : 170); y += 160; x.fillText(big, 80, y); y += 44; }
+  x.fillStyle = "#111111"; x.font = F(500, 40);
+  for (const line of lines) for (const l of wrapLines(x, line, W - 160)) { y += 58; if (y > H - 170) break; x.fillText(l, 80, y); }
+  x.fillStyle = "#111111"; x.fillRect(80, H - 150, W - 160, 2);
+  x.font = F(700, 28); x.letterSpacing = "4px"; x.fillText("TRANSPARENCE DÉMOCRATIQUE", 80, H - 100); x.letterSpacing = "0px";
+  x.fillStyle = "#5F6873"; x.font = F(500, 30); x.fillText(SITE_URL.replace(/^https?:\/\//, ""), 80, H - 56);
   const blob = await new Promise((r) => c.toBlob(r, "image/png"));
   const f = new File([blob], file, { type: "image/png" }), msg = `${text} ${link || SITE_URL}`.trim();
   if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f], text: msg }); return; } catch (e) { if (e.name === "AbortError") return; } }
