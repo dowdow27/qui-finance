@@ -17,6 +17,8 @@ Un site qui réunit, cherche et compare deux registres publics, mis à jour auto
 - **Votations** : chaque objet fédéral depuis 2023, avec son résultat, la carte des cantons, les mots d'ordre, et l'argent du oui et du non (donateurs compris) quand les comités l'ont déclaré au CDF.
 - **Parlement** : composition du Conseil national et du Conseil des États (hémicycles cliquables) ; votes nominaux du Conseil national (qui a voté quoi, par groupe) ; « les élus liés à un groupe d'intérêts votent-ils comme leur parti ? » ; puis vue par élu ou par mandat, filtres par parti, conseil, secteur, rémunération. Export CSV.
 - **Tendances** : plus gros donateurs, argent par secteur, argent reçu par parti, budget du oui contre budget du non pour chaque votation, secteurs les plus présents au Parlement, mandats rémunérés par parti, évolution semaine après semaine.
+- **Jouer** : « Vote comme un élu » (10 vrais votes du Conseil national, puis les élus et partis les plus proches), quiz de la semaine (renouvelé à chaque mise à jour), « Plus ou moins ? », « Mes élus » par canton. Chaque résultat se partage en image 1080 × 1350 (réseaux sociaux).
+- **Classements** : l'argent gagne-t-il les votations, combien coûte une voix, donateurs de plusieurs partis, cumul de mandats rémunérés, nouveaux mandats depuis l'élection, qui fait entrer quels lobbyistes, frondeurs et absents au Conseil national.
 - **Nouveautés** : ce qui a changé depuis la dernière mise à jour (nouveaux dons, nouveaux mandats, mandats terminés).
 
 ## Mise en ligne (5 minutes, gratuit)

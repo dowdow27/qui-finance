@@ -216,6 +216,7 @@ def build_lobbywatch() -> dict:
             "photo": PHOTO_URL.format(p["parlament_number"]) if p.get("parlament_number") else "",
             "parlement": BIO_URL.format(p["parlament_biografie_id"]) if p.get("parlament_biografie_id") else "",
             "pn": p.get("parlament_biografie_id"),  # = PersonNumber des votes nominaux de parlament.ch
+            "depuis": p.get("im_rat_seit") or "",
             "url": f"https://lobbywatch.ch/fr/daten/parlamentarier/{pid}",
         })
         for ib in p.get("interessenbindungen") or []:
@@ -231,6 +232,7 @@ def build_lobbywatch() -> dict:
                 "role": ib.get("art") or "", "fonction": ib.get("funktion_im_gremium") or "",
                 "statut": statut, "montant": montant, "annee": annee,
                 "principal": bool(ib.get("hauptberuflich")),
+                "depuis": ib.get("von") or "",
             })
             for key in (o.get("name_de"), o.get("name_fr")):
                 if key and norm(key):
@@ -409,8 +411,9 @@ def build_votes(campagnes: list[dict]) -> list[dict]:
             cantons[c] = {"oui": fnum(r.get(f"{k}-japroz")), "participation": fnum(r.get(f"{k}-bet")),
                           "accepte": True if acc == "1" else False if acc == "0" else None}
         oui, part = fnum(r.get("volkja-proz")), fnum(r.get("bet"))
-        # swissvotes publie les détails cantonaux avec retard : on les prend alors à l'OFS
-        if day <= today and any(v["oui"] is None for v in cantons.values()):
+        voix_oui, voix_non = fnum(r.get("volkja")), fnum(r.get("volknein"))
+        # swissvotes publie les détails (cantons, voix) avec retard : on les prend alors à l'OFS
+        if day <= today and (voix_oui is None or any(v["oui"] is None for v in cantons.values())):
             try:
                 if day not in bfs_cache:
                     bfs_cache[day] = bfs_results(day)
@@ -419,6 +422,8 @@ def build_votes(campagnes: list[dict]) -> list[dict]:
                 vl = None
             if vl:
                 oui = oui if oui is not None else vl["resultat"].get("jaStimmenInProzent")
+                voix_oui = voix_oui if voix_oui is not None else vl["resultat"].get("jaStimmenAbsolut")
+                voix_non = voix_non if voix_non is not None else vl["resultat"].get("neinStimmenAbsolut")
                 part = part if part is not None else vl["resultat"].get("stimmbeteiligungInProzent")
                 for k in vl.get("kantone") or []:
                     c = CANTONS[int(k["geoLevelnummer"]) - 1]
@@ -441,6 +446,7 @@ def build_votes(campagnes: list[dict]) -> list[dict]:
             "oui": round(oui, 2) if oui is not None else None,
             "participation": round(part, 2) if part is not None else None,
             "cantons_oui": fnum(r.get("kt-ja")), "cantons_non": fnum(r.get("kt-nein")),
+            "voix_oui": int(voix_oui) if voix_oui is not None else None, "voix_non": int(voix_non) if voix_non is not None else None,
             "cantons": cantons,
             "mots_ordre": {label: PAROLES[r.get(f"p-{k}")] for k, label in SV_ACTORS if r.get(f"p-{k}") in PAROLES},
             "conseil_federal": {"1": "pour", "2": "contre", "8": "contre-projet", "9": "initiative"}.get(r.get("br-pos")),

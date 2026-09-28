@@ -49,7 +49,7 @@ function buildIndexes() {
 }
 
 /* ---------------- Navigation ---------------- */
-const TABS = ["chercher", "dons", "votations", "parlement", "tendances", "debats", "nouveautes"];
+const TABS = ["chercher", "jouer", "dons", "votations", "parlement", "tendances", "debats", "nouveautes"];
 function route() {
   const [tab, q] = decodeURIComponent(location.hash.slice(1)).split(":");
   const t = TABS.includes(tab) ? tab : "chercher";
@@ -57,7 +57,8 @@ function route() {
   document.querySelectorAll(".tabs a").forEach((a) => (a.dataset.tab === t ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
   document.querySelector(`.tabs a[data-tab="${t}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
   if (t === "chercher" && q != null && $("#q").value !== q) { $("#q").value = q; search(); }
-  if (t === "tendances") renderTrends();
+  if (t === "tendances") { renderClassements(); renderTrends(); }
+  if (t === "jouer") renderJouer(q);
   if (t === "debats") renderDebats();
   if (t === "parlement") renderParlVotes();
 }
@@ -546,6 +547,278 @@ function sheetCantonal(id) {
   <p class="note">Source : Office fédéral de la statistique. Le financement des campagnes cantonales n'est pas couvert par le Contrôle fédéral des finances.</p>`;
 }
 
+/* ---------------- Images à partager ---------------- */
+const SITE_URL = location.origin + location.pathname.replace(/index\.html$/, "");
+const SHARES = new Map();
+const shareBtn = (key, fn, label = "Partager l'image") => { SHARES.set(key, fn); return `<button class="btn ghost share" data-share="${esc(key)}">${esc(label)}</button>`; };
+function wrapLines(ctx, text, maxW) {
+  const out = []; let line = "";
+  for (const w of String(text).split(/\s+/)) { const t = line ? `${line} ${w}` : w; if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
+  if (line) out.push(line); return out;
+}
+async function shareCard({ kicker = "Qui finance ?", title, big, bigColor = "#C8202A", lines = [], text = "", file = "qui-finance.png" }) {
+  await document.fonts?.ready;
+  const W = 1080, H = 1350, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d"), F = (w, s) => `${w} ${s}px "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif`;
+  x.fillStyle = "#F3F4F1"; x.fillRect(0, 0, W, H);
+  x.fillStyle = "#C8202A"; x.fillRect(0, 0, W / 2, 20); x.fillStyle = "#1F5F8B"; x.fillRect(W / 2, 0, W / 2, 20);
+  let y = 130; x.fillStyle = "#5F6873"; x.font = F(700, 32); x.fillText(`${kicker}`.toUpperCase(), 80, y);
+  y += 95; x.fillStyle = "#16202A"; x.font = F(800, 66);
+  for (const l of wrapLines(x, title, W - 160).slice(0, 5)) { x.fillText(l, 80, y); y += 78; }
+  if (big) { x.fillStyle = bigColor; x.font = F(800, big.length > 9 ? 110 : 160); y += 150; x.fillText(big, 80, y); y += 40; }
+  x.fillStyle = "#16202A"; x.font = F(500, 40);
+  for (const line of lines) for (const l of wrapLines(x, line, W - 160)) { y += 60; if (y > H - 150) break; x.fillText(l, 80, y); }
+  x.fillStyle = "#5F6873"; x.font = F(700, 30); x.fillText("TRANSPARENCE DÉMOCRATIQUE", 80, H - 120);
+  x.font = F(500, 32); x.fillText(SITE_URL.replace(/^https?:\/\//, ""), 80, H - 70);
+  const blob = await new Promise((r) => c.toBlob(r, "image/png"));
+  const f = new File([blob], file, { type: "image/png" }), msg = `${text} ${SITE_URL}`.trim();
+  if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f], text: msg }); return; } catch (e) { if (e.name === "AbortError") return; } }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = file; a.click();
+  navigator.clipboard?.writeText(msg).catch(() => {});
+}
+
+/* ---------------- Classements ---------------- */
+const pctInt = (v) => `${Math.round(v)} %`;
+function argentGagne() {
+  const vs = V.filter((v) => v.argent && (v.argent.pour || v.argent.contre) && (v.statut === "Accepté" || v.statut === "Refusé"));
+  const rows = vs.map((v) => { const riche = v.argent.pour >= v.argent.contre ? "oui" : "non", gagnant = v.statut === "Accepté" ? "oui" : "non";
+    return { v, riche, gagnant, ok: riche === gagnant, ratio: Math.max(v.argent.pour, v.argent.contre) / Math.max(1, Math.min(v.argent.pour, v.argent.contre)) }; });
+  return { rows, n: rows.filter((r) => r.ok).length };
+}
+function coutVoix() {
+  const out = [];
+  for (const v of V) {
+    if (!v.argent) continue;
+    if (v.voix_oui && v.argent.pour) out.push({ v, camp: "oui", cout: v.argent.pour / v.voix_oui, gagne: v.statut === "Accepté" });
+    if (v.voix_non && v.argent.contre) out.push({ v, camp: "non", cout: v.argent.contre / v.voix_non, gagne: v.statut === "Refusé" });
+  }
+  return out.sort((a, b) => b.cout - a.cout);
+}
+const chf2 = (v) => v.toLocaleString("fr-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " CHF";
+function multiPartis() {
+  return [...idx.donor.values()].map((g) => { const par = {}; g.dons.forEach((d) => { if (d.parti && d.cat !== "Votation") par[d.parti] = (par[d.parti] || 0) + (d.montant || 0); });
+    return { g, par: Object.entries(par).sort((a, b) => b[1] - a[1]) }; }).filter((x) => x.par.length >= 2).sort((a, b) => b.par.length - a.par.length || b.g.total - a.g.total);
+}
+const isLobbyiste = (b) => /interessenvertreter|représentant|repräsentant/i.test(b.fonction);
+const orgBadge = (b) => (b.fonction.split(":").slice(1).join(":").trim() || b.mandats[0] || "");
+const LEG_DEBUT = "2023-12-04";
+
+function renderClassements() {
+  const box = $("#classements"); if (!box || box.dataset.ready) return;
+  box.dataset.ready = "1";
+  const cards = [];
+  // L'argent gagne-t-il ?
+  const ag = argentGagne();
+  if (ag.rows.length) cards.push(card("L'argent gagne-t-il ?", "Le camp qui a déclaré le plus de recettes au CDF a-t-il remporté la votation ?",
+    `<div class="kpis">${kpi(`${ag.n} sur ${ag.rows.length}`, "votations gagnées par le camp le plus riche", "money")}</div>
+    <ul class="list">${ag.rows.map((r) => `<li><span>${linkBtn("vote", r.v.id, r.v.titre)}</span><span class="tag ${r.ok ? "paid" : ""}">${r.ok ? "l'argent a gagné" : "l'argent a perdu"}</span>
+      <span class="sub">${esc(dateFr(r.v.date))} · le ${r.riche} a dépensé ${num1(r.ratio)} fois plus · résultat : ${esc(r.v.statut.toLowerCase())} (${pct(r.v.oui)})</span></li>`).join("")}</ul>
+    ${shareBtn("argent-gagne", () => shareCard({ kicker: "L'argent gagne-t-il ?", title: "Votations fédérales depuis 2023 : le camp qui a dépensé le plus a gagné", big: `${ag.n} fois sur ${ag.rows.length}`, lines: ["Recettes déclarées par les comités au Contrôle fédéral des finances."], text: `L'argent gagne-t-il les votations ? ${ag.n} fois sur ${ag.rows.length}.`, file: "argent-gagne.png" }))}`, true));
+  // Combien coûte une voix
+  const cv = coutVoix();
+  if (cv.length) { const top = cv[0];
+    cards.push(card("Combien coûte une voix ?", "Recettes déclarées par un camp, divisées par le nombre de voix qu'il a obtenues.",
+    bars(cv.slice(0, 15).map((c) => ({ label: `${c.camp === "oui" ? "Oui" : "Non"} : ${c.v.titre}`, value: c.cout, open: ["vote", c.v.id] })), "m", chf2)
+    + shareBtn("cout-voix", () => shareCard({ kicker: "Combien coûte une voix ?", title: `Le ${top.camp} à « ${top.v.titre} » (${dateFr(top.v.date)})`, big: chf2(top.cout), lines: [`par voix obtenue : ${chf(top.camp === "oui" ? top.v.argent.pour : top.v.argent.contre)} de recettes déclarées pour ${nf.format(top.camp === "oui" ? top.v.voix_oui : top.v.voix_non)} voix. ${top.gagne ? "Il a gagné." : "Il a perdu."}`], text: `Le ${top.camp} à « ${top.v.titre} » : ${chf2(top.cout)} par voix.`, file: "cout-voix.png" }))));
+  }
+  // Donateurs sur plusieurs partis
+  const mp = multiPartis();
+  if (mp.length) cards.push(card("Ils financent plusieurs partis", "Donateurs qui ont donné à au moins deux partis (hors campagnes de votation).",
+    `<ul class="list">${mp.slice(0, 12).map((x) => `<li><span>${linkBtn("donor", x.g.nom, x.g.nom)}</span><span class="amount money">${chf(sum(x.par, (p) => p[1]))}</span>
+      <span class="sub">${x.par.map(([p, v]) => `${esc(p)} ${short(v)}`).join(" · ")}</span></li>`).join("")}</ul>
+    ${shareBtn("multi-partis", () => shareCard({ kicker: "Ils financent plusieurs partis", title: `${mp[0].g.nom} a donné à ${mp[0].par.length} partis`, big: short(sum(mp[0].par, (p) => p[1])) + " CHF", bigColor: "#C8202A", lines: mp[0].par.map(([p, v]) => `${p} : ${chf(v)}`), text: `${mp[0].g.nom} finance ${mp[0].par.length} partis.`, file: "multi-partis.png" }))}`));
+  // Cumul de mandats rémunérés
+  const cumul = L.elus.map((e) => ({ e, paid: e.liens.filter((l) => l.statut === "remunere").length })).sort((a, b) => b.paid - a.paid || b.e.liens.length - a.e.liens.length).slice(0, 15);
+  cards.push(card("Cumul de mandats rémunérés", "Mandats en cours déclarés comme rémunérés (montant souvent non communiqué).",
+    bars(cumul.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.paid, open: ["elu", x.e.id] })), "i", (v) => v)
+    + shareBtn("cumul", () => shareCard({ kicker: "Cumul de mandats", title: `${cumul[0].e.nom} (${cumul[0].e.parti}, ${cumul[0].e.canton}) déclare`, big: `${cumul[0].paid} mandats`, bigColor: "#1F5F8B", lines: ["rémunérés, en cours, selon Lobbywatch.", `Suivent : ${cumul.slice(1, 4).map((x) => `${x.e.nom} (${x.paid})`).join(", ")}.`], text: `Le record de mandats rémunérés au Parlement : ${cumul[0].paid}.`, file: "cumul-mandats.png" }))));
+  // Nouveaux mandats depuis le début de la législature
+  const nouveaux = L.elus.map((e) => ({ e, n: e.liens.filter((l) => l.depuis >= LEG_DEBUT).length, paid: e.liens.filter((l) => l.depuis >= LEG_DEBUT && l.statut === "remunere").length })).filter((x) => x.n).sort((a, b) => b.n - a.n).slice(0, 15);
+  if (nouveaux.length) cards.push(card("Nouveaux mandats depuis l'élection", "Mandats commencés depuis le début de la législature (4 décembre 2023). Partie foncée : rémunérés. Date de début connue pour environ deux mandats sur trois.",
+    bars(nouveaux.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.paid, value2: x.n - x.paid, open: ["elu", x.e.id] })), "i", (v) => v)));
+  // Qui fait entrer qui
+  const lob = L.badges.filter(isLobbyiste), hotes = {};
+  lob.forEach((b) => { (hotes[b.p] ||= []).push(b); });
+  const topH = Object.entries(hotes).sort((a, b) => b[1].length - a[1].length).slice(0, 12);
+  if (lob.length) cards.push(card("Qui fait entrer qui au Palais fédéral", `Chaque élu peut donner deux badges d'accès permanents. ${lob.length} vont à des représentants d'intérêts déclarés.`,
+    `<ul class="list">${topH.map(([p, bs]) => { const e = idx.elu.get(+p); return e ? `<li><span>${linkBtn("elu", e.id, e.nom)} <small class="note">${esc(e.parti)}</small></span><span class="tag">${bs.length} lobbyiste${bs.length > 1 ? "s" : ""}</span>
+      <span class="sub">${bs.map((b) => `${esc(b.nom)} (${esc(orgBadge(b))})`).join(" · ")}</span></li>` : ""; }).join("")}</ul>`, true));
+  // Frondeurs et absents (votes nominaux, chargés à la demande)
+  cards.push(`<div class="card" id="cl-frondeurs"><h3>Qui vote le plus souvent contre son groupe ?</h3><p class="note">Chargement des votes…</p></div>`);
+  cards.push(`<div class="card" id="cl-absents"><h3>Qui manque le plus de votes ?</h3><p class="note">Chargement des votes…</p></div>`);
+  box.innerHTML = cards.join("");
+  loadParl().then((p) => {
+    if (!p) return;
+    const st = L.elus.filter((e) => p.elus[e.id] && e.conseil === "CN").map((e) => ({ e, ...p.elus[e.id] }));
+    const fr = [...st].sort((a, b) => b.contre_groupe - a.contre_groupe).slice(0, 12);
+    const ab = st.filter((x) => x.participation != null).sort((a, b) => a.participation - b.participation).slice(0, 12);
+    $("#cl-frondeurs").innerHTML = `<h3>Qui vote le plus souvent contre son groupe ?</h3><p class="hint">Votes oui ou non contraires à la majorité de son groupe parlementaire, législature en cours, Conseil national. Les élus de petits partis rattachés à un grand groupe (PEV avec le Centre, par exemple) ressortent naturellement.</p>
+      ${bars(fr.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.contre_groupe, open: ["elu", x.e.id] })), "i", (v) => nf.format(v))}
+      ${shareBtn("frondeurs", () => shareCard({ kicker: "Les frondeurs du Conseil national", title: `${fr[0].e.nom} (${fr[0].e.parti}) a voté contre son groupe`, big: `${nf.format(fr[0].contre_groupe)} fois`, bigColor: "#1F5F8B", lines: ["depuis décembre 2023.", `Suivent : ${fr.slice(1, 4).map((x) => `${x.e.nom} (${nf.format(x.contre_groupe)})`).join(", ")}.`], text: "Qui vote le plus contre son propre groupe au Conseil national ?", file: "frondeurs.png" }))}`;
+    $("#cl-absents").innerHTML = `<h3>Qui manque le plus de votes ?</h3><p class="hint">Part des votes auxquels l'élu n'a pas pris part (absent ou excusé), législature en cours. Un congé maladie ou maternité, ou une élection en cours de législature, peut l'expliquer.</p>
+      ${bars(ab.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: 100 - x.participation, open: ["elu", x.e.id] })), "m", (v) => pctInt(v))}`;
+  });
+}
+
+/* ---------------- Jouer ---------------- */
+const GAMES = { match: "Vote comme un élu", quiz: "Le quiz de la semaine", plusmoins: "Plus ou moins ?", canton: "Mes élus" };
+let GAME_RUN = 0;  // une seule partie à la fois : une partie lancée remplace la précédente
+const stale = (run) => run !== GAME_RUN;
+function renderJouer(sub) {
+  const g = GAMES[sub] ? sub : "";
+  const run = ++GAME_RUN;
+  $("#jeux-menu").innerHTML = Object.entries(GAMES).map(([k, l]) => `<a class="chip${k === g ? " on" : ""}" href="#jouer:${k}">${esc(l)}</a>`).join("");
+  const box = $("#jeu");
+  if (!g) { box.innerHTML = `<div class="grid">${[
+    ["match", "Répondez à 10 vrais votes du Conseil national et découvrez quels élus votent comme vous… et qui les finance."],
+    ["quiz", "Cinq questions tirées des données de la semaine. Nouveau quiz chaque lundi."],
+    ["plusmoins", "Qui a donné le plus ? Qui cumule le plus de mandats ? Enchaînez les bonnes réponses."],
+    ["canton", "Les élus de votre canton en un coup d'œil : mandats, rémunérations, présence aux votes."],
+  ].map(([k, t]) => `<a class="card game-card" href="#jouer:${k}"><h3>${esc(GAMES[k])}</h3><p class="note">${esc(t)}</p><span class="btn">Jouer</span></a>`).join("")}</div>`; return; }
+  ({ match: gameMatch, quiz: gameQuiz, plusmoins: gamePlusMoins, canton: gameCanton })[g](box, run);
+}
+
+// Vote comme un élu
+async function gameMatch(box, run) {
+  box.innerHTML = `<p class="note">Chargement des votes…</p>`;
+  const p = await loadParl(); if (stale(run)) return; if (!p) { box.innerHTML = `<p class="empty">Votes indisponibles pour l'instant.</p>`; return; }
+  const seen = new Set(), picks = [];
+  for (const s of p.scrutins) {  // du plus récent au plus ancien : votes finaux ou d'ensemble, serrés et sur des objets différents
+    if (!["Vote final", "Vote sur l'ensemble"].includes(s[5]) || seen.has(s[2])) continue;
+    const c = tally(s); if (c.o + c.n < 150 || Math.min(c.o, c.n) / (c.o + c.n) < 0.3) continue;
+    seen.add(s[2]); picks.push(s); if (picks.length === 10) break;
+  }
+  const rep = [];
+  const step = () => {
+    if (stale(run)) return;
+    const i = rep.length;
+    if (i === picks.length) return resultats();
+    const s = picks[i];
+    box.innerHTML = `<div class="card quiz"><p class="note">Vote ${i + 1} sur ${picks.length} · ${esc(dateFr(s[1]))}</p><h3>${esc(s[3])}</h3>
+      <p class="note">${s[5] === "Vote final" ? "Vote final : oui = adopter le texte, non = le rejeter." : "Vote sur l'ensemble : oui = accepter le projet, non = le refuser."} Objet ${esc(s[2])}${affaireUrl(s[2]) ? ` · <a href="${esc(affaireUrl(s[2]))}" target="_blank" rel="noopener">en savoir plus</a>` : ""}</p>
+      <div class="answers"><button class="btn yes" data-m="o">Oui</button><button class="btn no" data-m="n">Non</button><button class="btn ghost" data-m="">Je ne sais pas</button></div>
+      <div class="progress"><span style="width:${100 * i / picks.length}%"></span></div></div>`;
+    box.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => { rep.push(b.dataset.m); step(); }));
+  };
+  const resultats = () => {
+    const scores = L.elus.filter((e) => e.conseil === "CN" && e.pn).map((e) => {
+      let ok = 0, n = 0;
+      picks.forEach((s, i) => { const d = decision(s, e.pn); if (rep[i] && (d === "o" || d === "n")) { n++; ok += d === rep[i]; } });
+      return { e, n, pct: n ? 100 * ok / n : null };
+    }).filter((x) => x.n >= 5).sort((a, b) => b.pct - a.pct);
+    const answered = rep.filter(Boolean).length;
+    if (answered < 5 || !scores.length) { box.innerHTML = `<p class="empty">Répondez à au moins 5 votes pour comparer. <a href="#jouer:match" data-restart>Recommencer</a></p>`; return; }
+    const parts = {}; scores.forEach((x) => { const k = x.e.parti; (parts[k] ||= []).push(x.pct); });
+    const partis = Object.entries(parts).filter(([, v]) => v.length >= 2).map(([k, v]) => [k, v.reduce((a, b) => a + b, 0) / v.length]).sort((a, b) => b[1] - a[1]);
+    const best = scores[0];
+    box.innerHTML = `<div class="card"><h3>Vous votez à ${pctInt(best.pct)} comme ${esc(best.e.nom)}</h3>
+      <p class="note">${esc(best.e.parti)}, ${esc(best.e.canton)} · sur ${answered} votes répondus, comparés aux votes réels du Conseil national.</p>
+      <section><h4>Les élus les plus proches de vous</h4>${bars(scores.slice(0, 8).map((x) => ({ label: `${x.e.nom} (${x.e.parti}, ${x.e.canton})`, value: x.pct, open: ["elu", x.e.id] })), "i", pctInt, 100)}</section>
+      <section><h4>Par parti (moyenne de ses élus)</h4>${bars(partis.map(([k, v]) => ({ label: k, value: v, open: idx.recip.has(k) ? ["recip", k] : null })), "m", pctInt, 100)}</section>
+      <section><h4>Les plus éloignés</h4>${bars(scores.slice(-3).reverse().map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "m", pctInt, 100)}</section>
+      <p class="note">Cliquez un élu pour voir ses mandats et qui finance son parti. Les votes comparés sont les derniers votes finaux ou d'ensemble les plus serrés.</p>
+      <div class="answers">${shareBtn("match", () => shareCard({ kicker: "Vote comme un élu", title: `Je vote comme ${best.e.nom} (${best.e.parti}, ${best.e.canton})`, big: pctInt(best.pct), bigColor: "#1F5F8B", lines: [`sur ${answered} vrais votes du Conseil national.`, `Mon parti le plus proche : ${partis[0][0]} (${pctInt(partis[0][1])}).`, "Et toi, tu votes comme qui ?"], text: `Je vote à ${pctInt(best.pct)} comme ${best.e.nom}. Et toi ?`, file: "vote-comme-un-elu.png" }))}<a class="btn ghost" href="#jouer:match" data-restart>Recommencer</a></div></div>`;
+  };
+  step();
+}
+
+// Quiz de la semaine (même quiz pour tout le monde, renouvelé à chaque mise à jour)
+function rngFrom(str) { let h = 1779033703; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 3432918353); let a = h >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const pickR = (r, arr) => arr[Math.floor(r() * arr.length)];
+const shuffle = (r, arr) => arr.map((x) => [r(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+async function gameQuiz(box, run) {
+  const semaine = (M.genere || "").slice(0, 10) || new Date().toISOString().slice(0, 10), r = rngFrom(semaine);
+  const p = await loadParl(); if (stale(run)) return;
+  const Q = [];
+  // 1. Plus gros donateur d'un parti
+  const partis = uniq(A.dons.map((d) => d.parti)).filter((pt) => { const ds = A.dons.filter((d) => d.parti === pt); return uniq(ds.map((d) => d.donateur)).length >= 4; });
+  if (partis.length) { const pt = pickR(r, partis), by = {}; A.dons.filter((d) => d.parti === pt).forEach((d) => { by[d.donateur] = (by[d.donateur] || 0) + (d.montant || 0); });
+    const top = Object.entries(by).sort((a, b) => b[1] - a[1]); const autres = shuffle(r, [...idx.donor.keys()].filter((k) => !by[k])).slice(0, 3);
+    Q.push({ q: `Qui a le plus donné au parti ${pt} depuis 2023 ?`, opts: shuffle(r, [top[0][0], ...autres]), ok: top[0][0], why: `${top[0][0]} : ${chf(top[0][1])}.`, open: ["recip", idx.recip.has(pt) ? pt : ""] }); }
+  // 2. Camp le plus riche d'une votation
+  const va = V.filter((v) => v.argent && v.argent.pour !== v.argent.contre);
+  if (va.length) { const v = pickR(r, va), ok = v.argent.pour > v.argent.contre ? "Le camp du oui" : "Le camp du non";
+    Q.push({ q: `« ${v.titre} » (${dateFr(v.date)}) : quel camp a déclaré le plus de recettes ?`, opts: ["Le camp du oui", "Le camp du non"], ok, why: `Oui : ${chf(v.argent.pour)}, non : ${chf(v.argent.contre)}. Résultat : ${v.statut.toLowerCase()}.`, open: ["vote", v.id] }); }
+  // 3. Nombre de mandats d'un élu
+  const gros = L.elus.filter((e) => e.liens.length >= 8);
+  if (gros.length) { const e = pickR(r, gros), n = e.liens.length, opts = shuffle(r, [n, Math.max(1, Math.round(n * 0.5)), Math.round(n * 1.6) + 1, Math.max(2, Math.round(n * 0.25))].map(String));
+    Q.push({ q: `Combien de mandats en cours déclare ${e.nom} (${e.parti}, ${e.canton}) ?`, opts: uniq(opts), ok: String(n), why: `${n} mandats, dont ${e.liens.filter((l) => l.statut === "remunere").length} rémunérés.`, open: ["elu", e.id] }); }
+  // 4. Vote d'un élu au vote final
+  if (p) { const finals = p.scrutins.filter((s) => s[5] === "Vote final").slice(0, 60), s = pickR(r, finals);
+    const cands = L.elus.filter((e) => e.pn && ["o", "n"].includes(decision(s, e.pn)));
+    if (s && cands.length) { const e = pickR(r, cands), d = decision(s, e.pn) === "o" ? "Oui" : "Non";
+      Q.push({ q: `${e.nom} (${e.parti}) a voté… au vote final sur « ${s[3]} » (${dateFr(s[1])}) ?`, opts: ["Oui", "Non"], ok: d, why: `${e.nom} a voté ${d.toLowerCase()}. Le Conseil national : ${tally(s).o} oui, ${tally(s).n} non.`, open: ["scrutin", s[0]] }); } }
+  // 5. Quel parti a reçu le plus d'un donateur
+  const mp = multiPartis();
+  if (mp.length) { const x = pickR(r, mp.slice(0, 20)), ok = x.par[0][0], autres = shuffle(r, uniq(A.dons.map((d) => d.parti)).filter((pt) => pt !== ok)).slice(0, 3);
+    Q.push({ q: `Quel parti a reçu le plus d'argent de ${x.g.nom} ?`, opts: shuffle(r, [ok, ...autres]), ok, why: x.par.map(([pt, v]) => `${pt} ${short(v)}`).join(" · "), open: ["donor", x.g.nom] }); }
+  const res = [];
+  const step = () => {
+    if (stale(run)) return;
+    const i = res.length;
+    if (i === Q.length) {
+      const score = res.filter(Boolean).length, grille = res.map((x) => (x ? "🟩" : "🟥")).join("");
+      box.innerHTML = `<div class="card quiz"><h3>${score} sur ${Q.length}</h3><p class="grille">${grille}</p><p class="note">Quiz de la semaine du ${esc(dateFr(semaine))}. Un nouveau quiz chaque lundi, avec les données de la semaine.</p>
+        <div class="answers">${shareBtn("quiz", () => shareCard({ kicker: "Le quiz de la semaine", title: `J'ai fait ${score} sur ${Q.length} au quiz « Qui finance ? »`, big: grille, bigColor: "#16202A", lines: ["Dons aux partis, mandats des élus, votes au Parlement.", "Et toi ?"], text: `Quiz Qui finance ? ${score}/${Q.length} ${grille}`, file: "quiz.png" }))}</div></div>`;
+      return;
+    }
+    const q = Q[i];
+    box.innerHTML = `<div class="card quiz"><p class="note">Question ${i + 1} sur ${Q.length}</p><h3>${esc(q.q)}</h3>
+      <div class="answers col">${q.opts.map((o) => `<button class="btn ghost" data-a="${esc(o)}">${esc(o)}</button>`).join("")}</div><div class="progress"><span style="width:${100 * i / Q.length}%"></span></div></div>`;
+    box.querySelectorAll("[data-a]").forEach((b) => b.addEventListener("click", () => {
+      const ok = b.dataset.a === q.ok; res.push(ok);
+      box.querySelectorAll("[data-a]").forEach((x) => { x.disabled = true; if (x.dataset.a === q.ok) x.classList.add("right"); });
+      if (!ok) b.classList.add("wrong");
+      box.querySelector(".answers").insertAdjacentHTML("afterend", `<p class="${ok ? "infl" : "money"}"><b>${ok ? "Bien vu !" : "Raté."}</b> ${esc(q.why)} ${q.open[1] !== "" ? linkBtn(q.open[0], q.open[1], "Voir la fiche") : ""}</p><button class="btn" data-next>${i + 1 < Q.length ? "Question suivante" : "Voir mon score"}</button>`);
+      box.querySelector("[data-next]").addEventListener("click", step);
+    }));
+  };
+  step();
+}
+
+// Plus ou moins
+function gamePlusMoins(box) {
+  const items = [
+    ...[...idx.donor.values()].filter((g) => g.total >= 20000).map((g) => ({ label: g.nom, sub: "a donné au total (partis et campagnes)", v: g.total, f: chf, open: ["donor", g.nom] })),
+    ...L.elus.filter((e) => e.liens.length).map((e) => ({ label: `${e.nom} (${e.parti})`, sub: "mandats en cours", v: e.liens.length, f: (x) => `${x} mandats`, open: ["elu", e.id] })),
+  ];
+  const types = (x) => (x.sub.startsWith("mandats") ? "m" : "d");
+  const r = Math.random; let serie = 0; const best = +(store.get("qf-plusmoins") || 0);
+  let a = pickR(r, items);
+  const next = () => {
+    let b; do { b = pickR(r, items.filter((x) => types(x) === types(a))); } while (b === a || b.v === a.v);
+    box.innerHTML = `<div class="card quiz"><p class="note">Série : <b>${serie}</b> · record : ${Math.max(best, serie)}</p>
+      <div class="pm"><div class="pm-item"><h3>${esc(a.label)}</h3><p class="big">${esc(a.f(a.v))}</p><p class="note">${esc(a.sub)}</p></div>
+      <div class="pm-item"><h3>${esc(b.label)}</h3><p class="note">${esc(b.sub)} : plus ou moins ?</p><div class="answers"><button class="btn yes" data-pm="1">Plus</button><button class="btn no" data-pm="-1">Moins</button></div></div></div></div>`;
+    box.querySelectorAll("[data-pm]").forEach((btn) => btn.addEventListener("click", () => {
+      const ok = (+btn.dataset.pm > 0) === (b.v > a.v);
+      if (ok) { serie++; a = b; next(); return; }
+      if (serie > best) store.set("qf-plusmoins", String(serie));
+      box.innerHTML = `<div class="card quiz"><h3>Perdu : ${esc(b.label)}, ${esc(b.f(b.v))}</h3><p class="note">${esc(a.label)} : ${esc(a.f(a.v))}.</p>
+        <p class="big">${serie} bonne${serie > 1 ? "s" : ""} réponse${serie > 1 ? "s" : ""} d'affilée</p><p class="note">Record : ${Math.max(best, serie)}</p>
+        <div class="answers"><button class="btn" data-restart-pm>Rejouer</button>${linkBtn(b.open[0], b.open[1], "Voir la fiche")}${shareBtn("plusmoins", () => shareCard({ kicker: "Plus ou moins ?", title: "Ma série au jeu « Qui finance ? »", big: `${serie}`, bigColor: "#1F5F8B", lines: ["bonnes réponses d'affilée sur les dons aux partis et les mandats des élus.", "Tu fais mieux ?"], text: `${serie} d'affilée à Plus ou moins ? sur Qui finance ?`, file: "plus-ou-moins.png" }))}</div></div>`;
+      box.querySelector("[data-restart-pm]").addEventListener("click", () => renderJouer("plusmoins"));
+    }));
+  };
+  next();
+}
+
+// Mes élus
+async function gameCanton(box, run) {
+  const cantons = uniq(L.elus.map((e) => e.canton)).sort(), saved = store.get("qf-canton");
+  const cur = cantons.includes(location.hash.split(":")[2]) ? location.hash.split(":")[2] : cantons.includes(saved) ? saved : "VD";
+  store.set("qf-canton", cur);
+  const p = await loadParl(); if (stale(run)) return;
+  const elus = L.elus.filter((e) => e.canton === cur).sort((a, b) => (a.conseil > b.conseil ? 1 : -1) || a.nom.localeCompare(b.nom));
+  box.innerHTML = `<div class="filters"><select id="mc-canton" aria-label="Canton">${cantons.map((c) => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+    <div class="elu-cards">${elus.map((e) => { const paid = e.liens.filter((l) => l.statut === "remunere").length, st = p?.elus[e.id];
+      return `<div class="card elu-card"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="56" height="56" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.conseil)}</small></span></button>
+        <div class="kpis small">${kpi(e.liens.length, "mandats", "infl")}${kpi(paid, "rémunérés", "money")}${st?.participation != null ? kpi(pctInt(st.participation), "présence aux votes") : ""}${st ? kpi(nf.format(st.contre_groupe), "votes contre son groupe") : ""}</div>
+        ${shareBtn(`elu-${e.id}`, () => shareCard({ kicker: `Mes élus · ${e.canton}`, title: `${e.nom} (${e.parti}, ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"})`, big: `${e.liens.length} mandats`, bigColor: "#1F5F8B", lines: [`dont ${paid} rémunérés, selon Lobbywatch.`, ...(st ? [`Présence aux votes : ${pctInt(st.participation)}. Votes contre son groupe : ${nf.format(st.contre_groupe)}.`] : []), "Qui sont les élus de ton canton ?"], text: `${e.nom} : ${e.liens.length} mandats dont ${paid} rémunérés.`, file: `elu-${e.id}.png` }), "Partager")}</div>`; }).join("")}</div>`;
+  $("#mc-canton").addEventListener("input", (ev) => { location.hash = `#jouer:canton:${ev.target.value}`; });
+}
+
 /* ---------------- Débats ---------------- */
 const { API = "", TS_KEY = "" } = window.QF || {};
 const DEBAT_TYPES = new Set(["donor", "recip", "elu", "org", "vote", "scrutin", "cantonal"]);
@@ -778,6 +1051,8 @@ document.addEventListener("click", (ev) => {
   if (ev.target.closest("[data-close]")) { closeSheet(); return; }
   const q = ev.target.closest("[data-q]"); if (q) { $("#q").value = q.dataset.q; search(); return; }
   const dq = ev.target.closest("[data-dons-q]"); if (dq) { location.hash = "#dons"; $("#fd-q").value = dq.dataset.donsQ; renderDons(); return; }
+  const sh = ev.target.closest("[data-share]"); if (sh) { SHARES.get(sh.dataset.share)?.(); return; }
+  const rs = ev.target.closest("[data-restart]"); if (rs) { ev.preventDefault(); renderJouer("match"); return; }
   const pr = ev.target.closest("[data-propose]"); if (pr) { openPropose(pr.dataset.propose); return; }
   const vb = ev.target.closest("[data-vote]"); if (vb) { castVote(vb); return; }
   const cm = ev.target.closest("[data-com]"); if (cm) { toggleComs(cm); return; }

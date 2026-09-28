@@ -231,6 +231,41 @@ svg.hemi .seat.dim { opacity: .18; }
 .ref-hit small { color: var(--muted); font-weight: 700; margin-right: 4px; }
 .ts-box { position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 40; }
 
+/* Jouer et partager */
+.promo { display: block; margin: 0 0 28px; padding: 14px 16px; border-radius: var(--radius-l); background: var(--infl-soft); color: var(--ink); text-decoration: none; border: 1px solid transparent; }
+.promo:hover { border-color: var(--infl); }
+.promo span { color: var(--infl); font-weight: 700; white-space: nowrap; }
+.chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+a.chip { text-decoration: none; }
+.game-card { display: grid; gap: 8px; align-content: start; color: inherit; text-decoration: none; }
+.game-card:hover { border-color: var(--ink); }
+.game-card .btn { justify-self: start; }
+.quiz { max-width: 720px; }
+.quiz h3 { font-size: 1.3rem; line-height: 1.3; }
+.answers { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; align-items: center; }
+.answers.col { display: grid; }
+.answers.col .btn { text-align: left; }
+.btn.yes { background: var(--yes); border-color: var(--yes); color: var(--card); }
+.btn.no { background: var(--no); border-color: var(--no); color: var(--card); }
+.btn.right { background: var(--yes); border-color: var(--yes); color: var(--card); }
+.btn.wrong { background: var(--no); border-color: var(--no); color: var(--card); }
+.btn:disabled { cursor: default; }
+.share { margin-top: 12px; }
+.progress { height: 6px; border-radius: 3px; background: var(--paper); overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--infl); }
+.grille { font-size: 2rem; letter-spacing: .1em; margin: 0 0 8px; }
+.big { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; margin: 6px 0; }
+.pm { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pm-item { background: var(--paper); border-radius: var(--radius-s); padding: 14px; }
+.pm-item h3 { font-size: 1.05rem; }
+.elu-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.elu-card-head { all: unset; cursor: pointer; display: flex; gap: 12px; align-items: center; }
+.elu-card-head img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; object-position: top; }
+.elu-card-head:hover strong { text-decoration: underline; }
+.kpis.small { gap: 14px; margin: 12px 0 4px; }
+.kpis.small .kpi b { font-size: 1.15rem; }
+@media (max-width: 640px) { .pm { grid-template-columns: 1fr; } }
+
 /* Nouveautés */
 .week { border-top: 2px solid var(--ink); padding: 14px 0 24px; }
 .week h3 { font-size: 1.2rem; }

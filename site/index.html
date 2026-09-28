@@ -17,10 +17,11 @@
     <a class="brand" href="#chercher">Qui finance ?</a>
     <nav class="tabs" aria-label="Sections">
       <a href="#chercher" data-tab="chercher">Chercher</a>
+      <a href="#jouer" data-tab="jouer">Jouer</a>
       <a href="#dons" data-tab="dons">Dons</a>
       <a href="#votations" data-tab="votations">Votations</a>
       <a href="#parlement" data-tab="parlement">Parlement</a>
-      <a href="#tendances" data-tab="tendances">Tendances</a>
+      <a href="#tendances" data-tab="tendances">Classements</a>
       <a href="#debats" data-tab="debats">Débats</a>
       <a href="#nouveautes" data-tab="nouveautes">Nouveautés</a>
     </nav>
@@ -37,6 +38,7 @@
       <input id="q" type="search" placeholder="UBS, Blocher, assurance, Wehrli…" autocomplete="off" autofocus>
     </label>
     <div class="chips" id="suggest"></div>
+    <a class="promo" href="#jouer:match"><b>Nouveau : vote comme un élu.</b> Répondez à 10 vrais votes du Conseil national et découvrez quels élus votent comme vous, et qui les finance. <span>Jouer →</span></a>
     <div id="results"></div>
   </section>
 
@@ -74,7 +76,17 @@
     <div class="pager" id="p-parl"></div>
   </section>
 
+  <section id="tab-jouer" class="tab" hidden>
+    <h2>Jouer</h2>
+    <p class="note">Explorer les données en jouant. Toutes les réponses viennent des registres officiels et de Lobbywatch.</p>
+    <div class="chips" id="jeux-menu"></div>
+    <div id="jeu"></div>
+  </section>
+
   <section id="tab-tendances" class="tab" hidden>
+    <h2>Classements</h2>
+    <p class="note">Les chiffres qui font parler, calculés à partir des registres. Chaque ligne renvoie à sa fiche, avec les précautions de lecture.</p>
+    <div class="grid" id="classements"></div>
     <h2>Tendances</h2>
     <div class="filters" id="f-trend"></div>
     <div class="grid" id="charts"></div>
