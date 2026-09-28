@@ -35,6 +35,7 @@ LW_URL = ("https://cms.lobbywatch.ch/sites/lobbywatch.ch/files/exports/"
           "lobbywatch_export_aggregated.json.zip")
 LW_INNER = "parlamentarier_nested"
 PHOTO_URL = "https://www.parlament.ch/SiteCollectionImages/profil/portrait-260/{}.jpg"  # © ParlCH
+BIO_URL = "https://www.parlament.ch/fr/biografie?CouncillorId={}"
 SV_URL = "https://swissvotes.ch/page/dataset/swissvotes_dataset.csv"  # CC BY 4.0
 BFS_URL = "https://ogd-static.voteinfo-app.ch/v1/ogd/sd-t-17-02-{}-eidgAbstimmung.json"
 UA = {"User-Agent": "qui-finance-ch/1.0"}
@@ -207,6 +208,7 @@ def build_lobbywatch() -> dict:
             "profession": p.get("beruf_fr") or p.get("beruf") or "",
             "fraction": p.get("fraktion") or "",
             "photo": PHOTO_URL.format(p["parlament_number"]) if p.get("parlament_number") else "",
+            "parlement": BIO_URL.format(p["parlament_number"]) if p.get("parlament_number") else "",
             "url": f"https://lobbywatch.ch/fr/daten/parlamentarier/{pid}",
         })
         for ib in p.get("interessenbindungen") or []:
