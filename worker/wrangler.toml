@@ -8,4 +8,4 @@ compatibility_date = "2026-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "qui-finance-debats"
-database_id = "00000000-0000-0000-0000-000000000000"  # remplacé après « wrangler d1 create »
+database_id = "21b94fc5-ad8a-4fb2-ac32-a9618e407236"
