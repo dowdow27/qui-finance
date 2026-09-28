@@ -13,9 +13,11 @@ Un site qui réunit, cherche et compare deux registres publics, mis à jour auto
 
 ## Ce que fait le site
 
-Cinq entrées : **Chercher** (accueil), **Classements** (avec Absences et Lobbyistes), **Jouer**, **Explorer** (Dons, Votations, Parlement, Réseaux, Nouveautés) et **Débats**.
+Six entrées : **Chercher** (accueil), **Classements** (avec Absences et Lobbyistes), **Jouer**, **Explorer** (Dons, Votations, Parlement, Réseaux, Nouveautés), **S'engager** et **Débats**.
 
 - **Accueil** : « Dans l'actualité » (un élu cité par la presse des 14 derniers jours, flux RSS, avec sa fiche à côté ; sinon l'élu du jour tiré au sort), la question de la semaine (un chiffre du site, une question de fond, un sondage oui/non ; le site donne les chiffres, les lecteurs tranchent, puis défendent leur position dans les Débats), la prochaine votation et l'argent déclaré par chaque camp, le jeu « Vous votez comme quel élu ? », puis la recherche.
+- **Cote de confiance** : « Faites-vous confiance à cet élu ? » Un vote par personne et par élu, modifiable, résultats publics sur l'accueil (par canton), sur chaque fiche et en classement par parti. Un élu entre dans les classements à partir de 10 votes. Ce n'est pas un sondage représentatif : ce sont les lecteurs du site.
+- **S'engager** : voter (ch.ch, easyvote, smartvote), interpeller, adhérer ou donner. Liens officiels de chaque parti représenté aux Chambres (`site/partis.json`, à compléter), même format pour tous, ordre par sièges. Les clics sont comptés sans donnée personnelle et le compteur est public.
 - **Chercher** : une seule barre pour les donateurs, bénéficiaires, élus, organisations et titulaires de badges. Chaque résultat ouvre une fiche, avec les liens croisés (une entreprise qui donne de l'argent ET qui a des élus dans ses conseils).
 - **Dons** : tableau filtrable par type (élection, votation, parti), parti, secteur, année, camp (pour ou contre), montant. Export CSV.
 - **Votations** : chaque objet fédéral depuis 2023, avec son résultat, la carte des cantons, les mots d'ordre, et l'argent du oui et du non (donateurs compris) quand les comités l'ont déclaré au CDF.
@@ -46,6 +48,8 @@ Onglet « Débats » : chacun propose une hypothèse qui cite au moins une fiche
 - En local : `npx wrangler d1 execute qui-finance-debats --local --file worker/schema.sql`, puis `npx wrangler dev --config worker/wrangler.toml` et `cd site && python3 -m http.server 8000` (clés de test Turnstile dans `worker/.dev.vars`, non versionné).
 
 ## Adapter les catégories
+
+- `site/partis.json` : liens officiels des partis pour la page S'engager (`parti` doit correspondre au nom utilisé par Lobbywatch : UDC, PS, Le Centre, PLR, Verts, Vert'libéraux, PEV, UDF, MCG, Lega…).
 
 - `config/secteurs.csv` : classe les donateurs par secteur (« motif;secteur », le motif est une expression régulière sur le nom en minuscules, sans accents). Les donateurs non couverts sont classés via Lobbywatch quand leur nom y figure.
 - `config/alias_donateurs.csv` : regroupe les variantes d'un même donateur (« HEV Schweiz » et « Hauseigentümerverband (HEV) Schweiz »).

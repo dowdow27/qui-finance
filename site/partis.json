@@ -1,0 +1,73 @@
+[
+  {
+    "parti": "UDC",
+    "site": "https://www.udc.ch/",
+    "adherer": "https://www.udc.ch/participer/devenir-membre/",
+    "don": "https://www.udc.ch/participer/faire-un-don/"
+  },
+  {
+    "parti": "PS",
+    "site": "https://www.sp-ps.ch/fr",
+    "adherer": "https://www.sp-ps.ch/fr/devenir-membre",
+    "don": "https://www.sp-ps.ch/fr/faire-un-don"
+  },
+  {
+    "parti": "Le Centre",
+    "site": "https://le-centre.ch/",
+    "adherer": "https://le-centre.ch/participer/devenir-membre/",
+    "don": "https://le-centre.ch/participer/faire-un-don/"
+  },
+  {
+    "parti": "PLR",
+    "site": "https://www.plr.ch/",
+    "adherer": "https://www.plr.ch/adherer",
+    "don": "https://www.plr.ch/faire-un-don"
+  },
+  {
+    "parti": "Verts",
+    "site": "https://verts.ch/",
+    "adherer": "https://verts.ch/participer/devenir-membre",
+    "don": "https://verts.ch/participer/faire-un-don"
+  },
+  {
+    "parti": "Vert'libéraux",
+    "site": "https://grunliberale.ch/fr",
+    "adherer": "https://glp.swiss/mitmachen/",
+    "don": "https://glp.swiss/spenden",
+    "note": "Pages d'adhésion et de dons en allemand."
+  },
+  {
+    "parti": "MCG",
+    "site": "https://www.mcge.ch/",
+    "note": "Pas de page d'adhésion ni de dons trouvée : passer par le site."
+  },
+  {
+    "parti": "PEV",
+    "site": "https://www.evppev.ch/fr/",
+    "adherer": "https://www.evppev.ch/fr/participer/devenir-membre",
+    "don": "https://www.evppev.ch/fr/participer/donner-de-largent"
+  },
+  {
+    "parti": "UDF",
+    "site": "https://www.edu-schweiz.ch/",
+    "adherer": "https://www.edu-schweiz.ch/antrag-fuer-eine-mitgliedschaft/",
+    "don": "https://www.edu-schweiz.ch/spenden/",
+    "note": "Site en allemand."
+  },
+  {
+    "parti": "Lega",
+    "site": "https://lega-dei-ticinesi.ch/",
+    "don": "https://lega-dei-ticinesi.ch/donazioni/",
+    "note": "Site en italien."
+  },
+  {
+    "parti": "ALG",
+    "site": "https://www.alg-zug.ch/",
+    "note": "Alternative – die Grünen Zoug, site en allemand."
+  },
+  {
+    "parti": "LDP",
+    "site": "https://www.ldp.ch/",
+    "note": "Liberal-Demokratische Partei Basel-Stadt, site en allemand."
+  }
+]

@@ -44,6 +44,10 @@ async function route(req, env) {
   if ((r = p.match(/^\/hypotheses\/(\d+)\/vote$/)) && m === "POST") return vote(req, env, +r[1]);
   if ((r = p.match(/^\/sondages\/([a-z0-9-]{3,40})$/)) && m === "GET") return getSondage(env, r[1], url);
   if ((r = p.match(/^\/sondages\/([a-z0-9-]{3,40})\/vote$/)) && m === "POST") return voteSondage(req, env, r[1]);
+  if (p === "/confiance" && m === "GET") return getConfiance(env, url);
+  if ((r = p.match(/^\/confiance\/(\d{1,6})\/vote$/)) && m === "POST") return voteConfiance(req, env, +r[1]);
+  if (p === "/clics" && m === "GET") return getClics(env);
+  if (p === "/clics" && m === "POST") return addClic(req, env);
   if (p.startsWith("/admin/")) {
     checkAdmin(req, env);
     if (p === "/admin/file" && m === "GET") return adminFile(env);
@@ -211,6 +215,48 @@ async function voteSondage(req, env, q) {
   return json(await sondageTotaux(env, q, votant));
 }
 
+/* ---------------- Cote de confiance ---------------- */
+
+const CONF_TOT = "SELECT elu, SUM(valeur = 1) AS oui, SUM(valeur = -1) AS non FROM confiance";
+async function getConfiance(env, url) {
+  const device = url.searchParams.get("d") || "";
+  const votant = /^[\w-]{16,64}$/.test(device) ? await votantHash(env, device) : "";
+  const [tot, mes] = await env.DB.batch([
+    env.DB.prepare(`${CONF_TOT} GROUP BY elu`),
+    env.DB.prepare("SELECT elu, valeur FROM confiance WHERE votant_hash = ?").bind(votant || "-"),
+  ]);
+  return json({ totaux: tot.results, mes: Object.fromEntries(mes.results.map((x) => [x.elu, x.valeur])) });
+}
+async function voteConfiance(req, env, elu) {
+  const b = await body(req);
+  const valeur = Number(b.valeur);
+  if (![-1, 1].includes(valeur)) throw fail(400, "Vote invalide");
+  if (!/^[\w-]{16,64}$/.test(String(b.device || ""))) throw fail(400, "Appareil invalide");
+  await human(req, env, b.turnstile);
+  const votant = await votantHash(env, b.device), iph = await ipHash(req, env);
+  const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM confiance WHERE elu = ?1 AND ip_hash = ?2 AND votant_hash <> ?3").bind(elu, iph, votant).first();
+  if (n >= MAX.votantsParIp) throw fail(429, "Trop de votes depuis cette connexion");
+  await env.DB.prepare(`INSERT INTO confiance (elu, votant_hash, ip_hash, valeur) VALUES (?, ?, ?, ?)
+    ON CONFLICT (elu, votant_hash) DO UPDATE SET valeur = excluded.valeur, ip_hash = excluded.ip_hash, maj_le = datetime('now')`).bind(elu, votant, iph, valeur).run();
+  const t = await env.DB.prepare(`${CONF_TOT} WHERE elu = ?`).bind(elu).first();
+  return json({ elu, oui: t?.oui || 0, non: t?.non || 0, mon_vote: valeur });
+}
+
+/* ---------------- Clics de la page S'engager ---------------- */
+
+async function getClics(env) {
+  const { results } = await env.DB.prepare("SELECT cible, COUNT(*) AS n FROM clics GROUP BY cible").all();
+  return json({ clics: results });
+}
+async function addClic(req, env) {
+  const b = await body(req);
+  const cible = String(b.cible || "");
+  if (!/^[a-z0-9-]{2,30}:(adherer|don|site)$/.test(cible)) throw fail(400, "Cible invalide");
+  const iph = await ipHash(req, env);
+  await env.DB.prepare("INSERT OR IGNORE INTO clics (cible, jour, ip_hash) VALUES (?, date('now'), ?)").bind(cible, iph).run();
+  return json({ ok: true });
+}
+
 /* ---------------- Modération ---------------- */
 
 function checkAdmin(req, env) {
@@ -219,14 +265,16 @@ function checkAdmin(req, env) {
 }
 
 async function adminFile(env) {
-  const [h, c, pub, sond] = await env.DB.batch([
+  const [h, c, pub, sond, conf, clics] = await env.DB.batch([
     env.DB.prepare("SELECT id, pseudo, titre, texte, refs, cree_le FROM hypotheses WHERE statut = 'attente' ORDER BY cree_le"),
     env.DB.prepare(`SELECT c.id, c.pseudo, c.texte, c.cree_le, c.hypothese_id, h.titre AS hypothese
       FROM commentaires c JOIN hypotheses h ON h.id = c.hypothese_id WHERE c.statut = 'attente' ORDER BY c.cree_le`),
     env.DB.prepare(`SELECT h.id, h.pseudo, h.titre, h.refs, h.publie_le, ${SCORE} FROM hypotheses h WHERE h.statut = 'publie' ORDER BY h.publie_le DESC LIMIT 100`),
     env.DB.prepare("SELECT question, SUM(valeur = 1) AS oui, SUM(valeur = -1) AS non FROM sondages GROUP BY question ORDER BY oui + non DESC"),
+    env.DB.prepare(`${CONF_TOT} GROUP BY elu ORDER BY oui + non DESC LIMIT 30`),
+    env.DB.prepare("SELECT cible, COUNT(*) AS n FROM clics GROUP BY cible ORDER BY n DESC"),
   ]);
-  return json({ hypotheses: parseRefs(h.results), commentaires: c.results, publiees: parseRefs(pub.results), sondages: sond.results });
+  return json({ hypotheses: parseRefs(h.results), commentaires: c.results, publiees: parseRefs(pub.results), sondages: sond.results, confiance: conf.results, clics: clics.results });
 }
 
 async function adminAction(req, env, table, id) {

@@ -50,7 +50,7 @@ function buildIndexes() {
 }
 
 /* ---------------- Navigation ---------------- */
-const TABS = ["chercher", "jouer", "absences", "lobbyistes", "reseaux", "dons", "votations", "parlement", "tendances", "debats", "nouveautes"];
+const TABS = ["chercher", "jouer", "absences", "lobbyistes", "reseaux", "dons", "votations", "parlement", "tendances", "engager", "debats", "nouveautes"];
 let TAB_CUR = "";
 function route() {
   const [tab, ...qs] = decodeURIComponent(location.hash.slice(1)).split(":");
@@ -70,6 +70,7 @@ function route() {
   if (t === "lobbyistes") renderLobbyistes();
   if (t === "reseaux") renderReseaux(q);
   if (t === "debats") renderDebats();
+  if (t === "engager") renderEngager();
   if (t === "parlement") renderParlVotes();
 }
 
@@ -132,7 +133,7 @@ function openSheet(type, key) {
   }
   if (!html) return;
   body.innerHTML = html; ficheDebats(type, key);
-  if (type === "elu") fillEluVotes(idx.elu.get(Number(key)));
+  if (type === "elu") { const e = idx.elu.get(Number(key)); fillEluVotes(e); if (API) loadConf().then(() => { const sec = $("#elu-conf"); if (sec && body.contains(sec)) sec.innerHTML = `<h3>Cote de confiance</h3>${confBlock(e)}`; }); }
   if (type === "vote") fillVoteFinal(idx.vote.get(key)); $("#sheet").hidden = false; $(".sheet-panel").scrollTop = 0; $(".close").focus();
 }
 const closeSheet = () => { $("#sheet").hidden = true; };
@@ -173,6 +174,7 @@ function sheetElu(e) {
   return `<div class="elu-head">${e.photo ? `<figure class="portrait"><img src="${esc(e.photo)}" alt="${esc(e.nom)}" width="84" height="84" loading="lazy" onerror="this.parentNode.remove()"><figcaption>© ParlCH</figcaption></figure>` : ""}
   <div><h2>${esc(e.nom)}</h2><p class="note">${esc(e.parti)}, ${esc(e.canton)}, ${esc(e.conseil)}${e.profession ? ". " + esc(e.profession) : ""}${e.commissions ? `. Commissions : ${esc(e.commissions)}` : ""}</p></div></div>
   <div class="kpis">${kpi(e.liens.length, "mandats en cours", "infl")}${kpi(paid.length, "rémunérés")}${kpi(known ? chf(known) : "–", "montants communiqués / an")}</div>
+  ${API ? `<section id="elu-conf"><h3>Cote de confiance</h3><p class="note">Chargement…</p></section>` : ""}
   <section><h3>Secteurs</h3>${bars(Object.entries(sect).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v })), "i", (v) => v)}</section>
   ${(() => { const lp = liensPotentiels().find((x) => x.e === e); return lp ? `<section><h3>Liens d'intérêts potentiels</h3><p class="hint">Commission de l'élu et mandat rémunéré ou badge donné dans le secteur qu'elle examine (correspondance Lobbywatch). Un lien n'est pas une faute.</p><ul class="list">${lp.hits.map((h) => `<li><span>${lpLine(h)}</span></li>`).join("")}</ul></section>` : ""; })()}
   <section><h3>Mandats</h3>${e.liens.length ? listMore([...e.liens].sort((a, b) => (b.statut === "remunere") - (a.statut === "remunere") || (b.montant || 0) - (a.montant || 0)).map((l) =>
@@ -618,7 +620,7 @@ const orgBadge = (b) => (b.fonction.split(":").slice(1).join(":").trim() || b.ma
 const LEG_DEBUT = "2023-12-04";
 
 const CL = { partis: "Quel parti reçoit le plus ?", "argent-gagne": "L'argent gagne-t-il ?", "cout-voix": "Combien coûte une voix ?", "multi-partis": "Ils financent plusieurs partis",
-  cumul: "Cumul de mandats rémunérés", nouveaux: "Nouveaux mandats depuis l'élection", badges: "Qui fait entrer qui au Palais fédéral", liens: "Commission et mandat rémunéré du même secteur", frondeurs: "Qui vote le plus souvent contre son parti ?", absents: "Qui manque le plus de votes ?" };
+  cumul: "Cumul de mandats rémunérés", nouveaux: "Nouveaux mandats depuis l'élection", badges: "Qui fait entrer qui au Palais fédéral", liens: "Commission et mandat rémunéré du même secteur", confiance: "Cote de confiance des lecteurs", frondeurs: "Qui vote le plus souvent contre son parti ?", absents: "Qui manque le plus de votes ?" };
 const clLink = (id) => `${SITE_URL}#tendances:${id}`;
 /* Par parti avant par élu : moyenne par élu, partis d'au moins 3 élus concernés, couleur du groupe parlementaire */
 function parParti(rows, val, min = 3) {
@@ -691,10 +693,12 @@ function renderClassements() {
     partiBars(parParti(comElus.map((e) => ({ e })), (r) => (lpSet.has(r.e.id) ? 100 : 0)), pctInt, "Par parti, part des élus concernés parmi ceux qui siègent dans une commission")
     + lpList(lp, 10)
     + shareBtn("liens", () => shareCard({ kicker: "Liens d'intérêts potentiels", title: `${lp.length} élus siègent dans une commission et sont rémunérés par une organisation du secteur qu'elle examine, ou y font entrer un lobbyiste`, big: `${lp.length} élus`, lines: lp.slice(0, 3).map((r) => `${r.e.nom} (${r.e.parti}) : ${lpLine(r.hits[0]).replace(/<[^>]+>/g, "")}`).concat(["Un lien n'est pas une faute : c'est une information."]), text: `${lp.length} parlementaires cumulent une commission et un mandat rémunéré du même secteur.`, file: "liens-potentiels.png", link: clLink("liens") })), true, "liens"));
+  if (API) cards.push(`<div class="card" id="cl-confiance"><h3>${esc(CL.confiance)}</h3><p class="note">Chargement des votes…</p></div>`);
   // Frondeurs et absents (votes nominaux, chargés à la demande)
   cards.push(`<div class="card" id="cl-frondeurs"><h3>${esc(CL.frondeurs)}</h3><p class="note">Chargement des votes…</p></div>`);
   cards.push(`<div class="card" id="cl-absents"><h3>${esc(CL.absents)}</h3><p class="note">Chargement des votes…</p></div>`);
   box.innerHTML = cards.join("");
+  if (API) loadConf().then(() => { const c = $("#cl-confiance"); if (c) c.innerHTML = clConfiance(); });
   loadParl().then((p) => {
     if (!p) return;
     const st = L.elus.filter((e) => p.elus[e.id] && e.conseil === "CN").map((e) => ({ e, ...p.elus[e.id] }));
@@ -1108,6 +1112,76 @@ async function renderSpotlight() {
     <p class="note">${presseMode ? "Élus cités par la presse ces 14 derniers jours (flux RSS), trois par jour. Le site ne commente pas l'article : il met la fiche à côté." : `Chaque jour, un élu tiré au sort parmi les ${L.elus.length}. Quand la presse cite un parlementaire, il prend la place.`}</p></section>`;
   box.outerHTML = html(null);
   const p = await loadParl(); if (p) { const t = document.createElement("div"); t.innerHTML = html(p); $(".spot")?.replaceWith(t.firstElementChild); }
+}
+
+/* ---------------- Cote de confiance ---------------- */
+/* « Faites-vous confiance à cet élu ? » Un vote par appareil et par élu, modifiable, résultats publics, même règle pour tous. */
+const CONF = { tot: new Map(), mes: {}, p: null };
+const MIN_CONF = 10;  // votes minimum pour figurer dans un classement
+function loadConf() {
+  if (!API) return Promise.resolve(CONF);
+  return (CONF.p ||= api(`/confiance?d=${device()}`).then((r) => { CONF.tot = new Map(r.totaux.map((t) => [t.elu, t])); CONF.mes = r.mes || {}; return CONF; }).catch(() => CONF));
+}
+const confOf = (id) => CONF.tot.get(id) || { elu: id, oui: 0, non: 0 };
+const confPct = (t) => (t.oui + t.non ? Math.round(100 * t.oui / (t.oui + t.non)) : null);
+function confBlock(e, compact) {
+  const t = confOf(e.id), n = t.oui + t.non, mine = CONF.mes[e.id], po = confPct(t);
+  return `<div class="conf-block" data-conf="${e.id}"${compact ? ' data-compact=""' : ""}>${compact ? "" : `<p class="conf-q">Faites-vous confiance à ${esc(e.nom)} ? <small class="note">Un vote par personne, modifiable, résultat public.</small></p>`}
+    <div class="conf-row"><button class="btn yes small" data-cvote="1" aria-pressed="${mine === 1}">Oui</button><button class="btn no small" data-cvote="-1" aria-pressed="${mine === -1}">Non</button>
+    <span class="conf-res">${n ? `<span class="conf-bar" role="img" aria-label="${po} % de oui"><span style="width:${po}%"></span></span><b class="${po >= 50 ? "infl" : "money"}">${po} %</b> de oui · ${n} vote${n > 1 ? "s" : ""}` : "Personne n'a encore voté."}</span><span class="vmsg" role="status"></span></div></div>`;
+}
+async function voteConf(btn) {
+  const box = btn.closest("[data-conf]"), id = +box.dataset.conf, e = idx.elu.get(id); if (!e) return;
+  const btns = box.querySelectorAll("[data-cvote]"), vmsg = $(".vmsg", box); btns.forEach((b) => (b.disabled = true)); vmsg.textContent = "…";
+  try {
+    const r = await api(`/confiance/${id}/vote`, { valeur: +btn.dataset.cvote, device: device(), turnstile: await humanToken() });
+    CONF.tot.set(id, { elu: id, oui: r.oui, non: r.non }); CONF.mes[id] = r.mon_vote;
+    document.querySelectorAll(`[data-conf="${id}"]`).forEach((b) => { b.outerHTML = confBlock(e, b.hasAttribute("data-compact")); });
+  } catch (err) { vmsg.textContent = `Vote impossible : ${err.message}`; btns.forEach((b) => (b.disabled = false)); }
+}
+function confRated() {
+  return L.elus.map((e) => ({ e, t: confOf(e.id) })).map((x) => ({ ...x, n: x.t.oui + x.t.non, pct: confPct(x.t) })).filter((x) => x.n >= MIN_CONF);
+}
+async function renderConfiance() {
+  const box = $("#conf"); if (!box) return; if (!API) { box.remove(); return; }
+  await loadConf();
+  const canton = store.get("qf-canton") || "", cantons = uniq(L.elus.map((e) => e.canton)).sort();
+  const elus = canton ? L.elus.filter((e) => e.canton === canton).sort((a, b) => (a.conseil === "CE" ? 0 : 1) - (b.conseil === "CE" ? 0 : 1) || a.nom.localeCompare(b.nom)) : [];
+  const rated = confRated(), top = [...rated].sort((a, b) => b.pct - a.pct || b.n - a.n).slice(0, 5), flop = [...rated].sort((a, b) => a.pct - b.pct || b.n - a.n).slice(0, 5);
+  const total = sum([...CONF.tot.values()], (t) => t.oui + t.non);
+  box.innerHTML = `<p class="eyebrow-s">Cote de confiance</p><h2 class="qs-q">Faites-vous confiance à vos élus ?</h2>
+    <p class="note">Un vote par personne et par élu, modifiable, résultats publics et visibles sur chaque fiche. ${total ? `${nf.format(total)} vote${total > 1 ? "s" : ""} jusqu'ici.` : "Les premiers votes font le classement."} Un élu entre dans les classements à partir de ${MIN_CONF} votes.</p>
+    <div class="filters conf-filters"><select id="conf-canton" aria-label="Canton"><option value="">Choisissez votre canton…</option>${cantons.map((c) => `<option value="${c}"${c === canton ? " selected" : ""}>${c}</option>`).join("")}</select>${canton ? `<span class="summary">${elus.length} élu${elus.length > 1 ? "s" : ""} fédéraux pour ${esc(canton)}</span>` : ""}</div>
+    ${canton ? `<ul class="conf-list">${elus.map((e) => `<li><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="44" height="44" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"}</small></span></button>${confBlock(e, true)}</li>`).join("")}</ul>` : ""}
+    ${rated.length ? `<div class="grid conf-grid"><div><h3>Les mieux notés</h3>${bars(top.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "i", (v) => `${v} %`, 100)}</div>
+      <div><h3>Les moins bien notés</h3>${bars(flop.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "m", (v) => `${v} %`, 100)}</div></div>
+      <div class="answers"><a class="btn ghost" href="#tendances:confiance">Le classement par parti</a>${shareBtn("confiance", () => shareCard({ kicker: "Cote de confiance", title: `Les élus fédéraux auxquels les lecteurs de Qui finance ? font le plus confiance`, big: `${top[0].pct} % de oui`, bigColor: "#1F5F8B", lines: top.slice(0, 5).map((x, i) => `${i + 1}. ${x.e.nom} (${x.e.parti}) : ${x.pct} % sur ${x.n} votes`).concat(["Et vos élus ? Votez sur quifinance."]), text: "Faites-vous confiance à vos élus ? Votez.", file: "confiance.png", link: clLink("confiance") }))}</div>` : ""}`;
+}
+function clConfiance() {
+  const rated = confRated();
+  if (!rated.length) return `<h3><a class="anchor" href="#tendances:confiance">${esc(CL.confiance)}</a></h3><p class="hint">« Faites-vous confiance à cet élu ? » : un vote par personne et par élu. Aucun élu n'a encore ${MIN_CONF} votes. <a href="#chercher">Votez pour les élus de votre canton</a>.</p>`;
+  const pp = {}; rated.forEach((x) => { const k = x.e.parti; (pp[k] ||= { oui: 0, n: 0, elus: 0 }); pp[k].oui += x.t.oui; pp[k].n += x.n; pp[k].elus++; });
+  const parti = Object.entries(pp).map(([parti, v]) => ({ parti, n: v.elus, moy: 100 * v.oui / v.n })).sort((a, b) => b.moy - a.moy);
+  const top = [...rated].sort((a, b) => b.pct - a.pct || b.n - a.n).slice(0, 12);
+  return `<h3><a class="anchor" href="#tendances:confiance">${esc(CL.confiance)}</a></h3><p class="hint">Part de oui à « Faites-vous confiance à cet élu ? », un vote par personne et par élu, élus d'au moins ${MIN_CONF} votes (${rated.length} élu${rated.length > 1 ? "s" : ""}). Ce n'est pas un sondage représentatif : ce sont les lecteurs du site.</p>
+    ${partiBars(parti, (v) => `${Math.round(v)} %`, "Par parti, part de oui sur l'ensemble des votes (nombre d'élus notés entre parenthèses)")}
+    ${bars(top.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "i", (v) => `${v} %`, 100)}
+    <p><a class="btn ghost" href="#chercher">Voter pour mes élus</a></p>`;
+}
+
+/* ---------------- S'engager ---------------- */
+async function renderEngager() {
+  const box = $("#engager"); if (!box || box.dataset.ready) return; box.dataset.ready = "1";
+  let partis = []; try { partis = await (await fetch("partis.json", { cache: "no-cache" })).json(); } catch { /* fichier absent */ }
+  const sieges = {}; L.elus.forEach((e) => { sieges[e.parti] = (sieges[e.parti] || 0) + 1; });
+  const clics = {}; if (API) { try { (await api("/clics")).clics.forEach((c) => (clics[c.cible] = c.n)); } catch { /* compteur indisponible */ } }
+  const rows = partis.filter((p) => sieges[p.parti]).sort((a, b) => sieges[b.parti] - sieges[a.parti]);
+  const slug = (p) => norm(p).replace(/ /g, "-"), utm = (u) => u + (u.includes("?") ? "&" : "?") + "utm_source=quifinance&utm_medium=engager";
+  const lnk = (p, k, label, ghost) => p[k] ? `<a class="btn${ghost ? " ghost" : ""}" href="${esc(utm(p[k]))}" target="_blank" rel="noopener" data-clic="${slug(p.parti)}:${k}">${label}</a>` : "";
+  const cpt = (p) => { const a = clics[`${slug(p.parti)}:adherer`] || 0, d = clics[`${slug(p.parti)}:don`] || 0; return a || d ? `Depuis ce site : ${a} clic${a > 1 ? "s" : ""} vers l'adhésion, ${d} vers les dons.` : "Aucun clic depuis ce site pour l'instant."; };
+  box.innerHTML = rows.length ? `<div class="grid">${rows.map((p) => `<div class="card parti-card"><h3>${esc(p.parti)} <small class="note">${sieges[p.parti]} siège${sieges[p.parti] > 1 ? "s" : ""}</small></h3>
+    <div class="answers">${lnk(p, "adherer", "Adhérer")}${lnk(p, "don", "Faire un don")}${lnk(p, "site", "Site officiel", true)}</div>
+    <p class="hint">${cpt(p)}${p.note ? " " + esc(p.note) : ""}</p></div>`).join("")}</div>` : `<p class="empty">Liste des partis indisponible.</p>`;
 }
 
 /* ---------------- À la une (accueil) ---------------- */
@@ -1597,6 +1671,8 @@ document.addEventListener("click", (ev) => {
   const pr = ev.target.closest("[data-propose]"); if (pr) { openPropose(pr.dataset.propose); return; }
   const vb = ev.target.closest("[data-vote]"); if (vb) { castVote(vb); return; }
   const sd = ev.target.closest("[data-sond]"); if (sd) { voteSondage(sd); return; }
+  const cv = ev.target.closest("[data-cvote]"); if (cv) { voteConf(cv); return; }
+  const cl = ev.target.closest("[data-clic]"); if (cl && API) api("/clics", { cible: cl.dataset.clic }).catch(() => {});  // le lien s'ouvre normalement
   const cm = ev.target.closest("[data-com]"); if (cm) { toggleComs(cm); return; }
   const ar = ev.target.closest("[data-addref]"); if (ar) { const r = refFromKey(ar.dataset.addref); if (r && PROP.length < 6 && !PROP.some((x) => x.type === r.type && x.key === r.key)) PROP.push(r); renderPropRefs(); $("#p-ref-q").value = ""; $("#p-ref-res").innerHTML = ""; $("#p-ref-q").focus(); return; }
   const dr = ev.target.closest("[data-delref]"); if (dr) { PROP.splice(+dr.dataset.delref, 1); renderPropRefs(); return; }
@@ -1609,6 +1685,7 @@ document.addEventListener("submit", (ev) => {
 });
 document.addEventListener("input", (ev) => {
   if (ev.target.id === "sc-groupe") { focusScrutin(ev.target.value); return; }
+  if (ev.target.id === "conf-canton") { store.set("qf-canton", ev.target.value); renderConfiance(); return; }
   if (ev.target.id === "fv-niveau") { const c = ev.target.value === "cantonal"; $("#f-votes").hidden = c; $("#f-cant").hidden = !c; renderVotes(); return; }
   if (ev.target.id !== "p-ref-q") return;
   $("#p-ref-res").innerHTML = searchRefs(ev.target.value).map((r) => `<button type="button" class="ref-hit" data-addref="${esc(r.type)}:${esc(r.key)}"><small>${esc(REF_LABEL[r.type])}</small> ${esc(r.label)}</button>`).join("");
@@ -1616,7 +1693,7 @@ document.addEventListener("input", (ev) => {
 
 (async function init() {
   [M, A, L, C, T, V] = await Promise.all([getJSON("meta", {}), getJSON("argent", { dons: [], campagnes: [] }), getJSON("lobby", { elus: [], liens: [], badges: [] }), getJSON("changes", []), getJSON("timeline", []), getJSON("votations", [])]);
-  buildIndexes(); status(); suggestions(); renderQuestion(); renderProchaine(); renderSpotlight(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
+  buildIndexes(); status(); suggestions(); renderQuestion(); renderProchaine(); renderSpotlight(); renderConfiance(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
   if (!C.length) document.querySelectorAll('a[href="#nouveautes"]').forEach((a) => (a.hidden = true));  // rien à montrer avant la 2e mise à jour
   else { const w = C[0], n = (w.dons_nouveaux || []).length, m = (w.mandats_nouveaux || []).length; const nl = $("#news-line"); nl.hidden = false; nl.innerHTML = `Cette semaine : ${n} nouveau${n > 1 ? "x" : ""} don${n > 1 ? "s" : ""}, ${m} nouveau${m > 1 ? "x" : ""} mandat${m > 1 ? "s" : ""}. <a href="#nouveautes">Voir les nouveautés →</a>`; }
   $("#fdb-tri").addEventListener("input", renderDebats);

@@ -96,6 +96,28 @@ a { color: var(--infl); }
 .prochaine .list li { padding: 7px 0; }
 .promo-card { border-top-color: var(--infl); }
 .home-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+/* Cote de confiance */
+.conf { border-top: 4px solid var(--infl); margin: 0 0 28px; padding: 20px 22px; }
+.conf .qs-q { margin: 6px 0 4px; font-size: clamp(1.3rem, 3.4vw, 1.8rem); }
+.conf-filters { margin: 12px 0; }
+.conf-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.conf-list li { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 8px 16px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.conf-list .elu-card-head img { width: 44px; height: 44px; }
+.conf-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.btn.small { padding: 5px 14px; font-size: .9rem; }
+.conf-block .btn[aria-pressed="true"] { outline: 3px solid var(--focus); outline-offset: 2px; }
+.conf-q { margin: 0 0 8px; font-weight: 700; }
+.conf-q small { font-weight: 400; }
+.conf-res { font-size: .9rem; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.conf-bar { display: inline-flex; width: 80px; height: 10px; border-radius: 3px; overflow: hidden; background: var(--money-soft); }
+.conf-bar span { background: var(--infl); }
+.conf-grid { margin-top: 10px; }
+.conf-grid h3 { margin-bottom: 8px; }
+@media (max-width: 640px) { .conf-list li { grid-template-columns: 1fr; } }
+/* S'engager */
+.parti-card h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.parti-card .answers { margin: 4px 0 8px; }
+.parti-card .btn { text-decoration: none; }
 .spot { border-top-color: var(--ink); }
 .spot-list { list-style: none; margin: 0; padding: 0; }
 .spot-row { padding: 10px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 4px; }

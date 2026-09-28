@@ -20,6 +20,7 @@
       <a href="#tendances" data-tab="tendances" data-group="tendances absences lobbyistes">Classements</a>
       <a href="#jouer" data-tab="jouer">Jouer</a>
       <a href="#dons" data-tab="dons" data-group="dons votations parlement reseaux nouveautes">Explorer</a>
+      <a href="#engager" data-tab="engager">S'engager</a>
       <a href="#debats" data-tab="debats">Débats</a>
     </nav>
   </div>
@@ -36,6 +37,7 @@
       <div id="spot"></div>
       <a class="card une-card promo-card" href="#jouer:match"><p class="eyebrow-s">Jouer</p><h3>Vous votez comme quel élu ?</h3><p class="note">Répondez à 10 vrais votes du Conseil national. Le site vous dit quels élus votent comme vous, et qui les finance.</p><span class="go">Jouer →</span></a>
     </div>
+    <section class="card conf" id="conf" aria-label="Cote de confiance"><p class="note">Chargement…</p></section>
     <h2 class="h-search">Chercher un nom</h2>
     <label class="search-big">
       <span class="sr">Recherche</span>
@@ -146,6 +148,27 @@
       <button class="btn" data-propose="">Proposer une hypothèse</button>
     </div>
     <div id="l-debats"></div>
+  </section>
+
+  <section id="tab-engager" class="tab" hidden>
+    <h2>S'engager</h2>
+    <p class="note">Trois façons de peser : voter, adhérer à un parti, le financer. Même présentation pour tous les partis représentés aux Chambres fédérales, classés par nombre de sièges. Le site ne recommande personne : il compte seulement les clics, sans donnée personnelle, et publie le compteur.</p>
+    <div class="grid">
+      <div class="card"><h3>Voter</h3><ul class="list">
+        <li><span><a href="https://www.ch.ch/fr/votations-et-elections/" target="_blank" rel="noopener">ch.ch : votations et élections</a></span><span class="sub">Dates, objets, vote par correspondance, inscription. Confédération et cantons.</span></li>
+        <li><span><a href="https://www.easyvote.ch/fr" target="_blank" rel="noopener">easyvote.ch</a></span><span class="sub">Explications neutres de chaque objet, pensées pour les 18-25 ans. Fédération suisse des parlements des jeunes.</span></li>
+        <li><span><a href="https://www.smartvote.ch/fr/home" target="_blank" rel="noopener">smartvote.ch</a></span><span class="sub">Comparez vos positions avec celles des candidats et des partis avant une élection.</span></li>
+        <li><span><a href="#jouer:match">Vote comme un élu</a> et <a href="#chercher">la cote de confiance</a></span><span class="sub">Sur ce site : dix vrais votes du Conseil national pour trouver les élus qui votent comme vous, et un vote de confiance sur chaque élu.</span></li>
+      </ul></div>
+      <div class="card"><h3>Interpeller</h3><ul class="list">
+        <li><span>Écrire à un élu</span><span class="sub">Chaque fiche d'élu renvoie à sa page officielle sur parlament.ch, avec ses coordonnées et ses interventions.</span></li>
+        <li><span><a href="#debats">Débattre ici</a></span><span class="sub">Proposez une hypothèse fondée sur les données, votez, commentez. Tout est relu avant publication.</span></li>
+        <li><span><a href="https://www.bk.admin.ch/bk/fr/home/droits-politiques.html" target="_blank" rel="noopener">Initiative et référendum</a></span><span class="sub">Lancer ou signer une initiative populaire ou un référendum. Chancellerie fédérale.</span></li>
+      </ul></div>
+    </div>
+    <h2>Adhérer ou donner</h2>
+    <p class="note">Liens officiels des partis, dans l'ordre du nombre de sièges aux Chambres fédérales. Les dons de plus de 15 000 CHF par an à un parti sont publiés par le Contrôle fédéral des finances ; en dessous, ils restent anonymes. Les liens portent une balise « utm_source=quifinance » : le parti sait que vous venez d'ici, le site ne sait pas qui vous êtes.</p>
+    <div id="engager"></div>
   </section>
 
   <section id="tab-nouveautes" class="tab" hidden>

@@ -48,3 +48,23 @@ CREATE TABLE IF NOT EXISTS sondages (
   PRIMARY KEY (question, votant_hash)
 );
 CREATE INDEX IF NOT EXISTS sond_ip ON sondages (question, ip_hash);
+
+-- Cote de confiance : « Faites-vous confiance à cet élu ? » Un vote par appareil et par élu, modifiable, plafonné par connexion.
+CREATE TABLE IF NOT EXISTS confiance (
+  elu INTEGER NOT NULL,               -- identifiant Lobbywatch de l'élu (lobby.json)
+  votant_hash TEXT NOT NULL,
+  ip_hash TEXT NOT NULL,
+  valeur INTEGER NOT NULL CHECK (valeur IN (-1, 1)),
+  cree_le TEXT NOT NULL DEFAULT (datetime('now')),
+  maj_le TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (elu, votant_hash)
+);
+CREATE INDEX IF NOT EXISTS conf_ip ON confiance (elu, ip_hash);
+
+-- Clics sortants de la page S'engager (« udc:adherer »), un par connexion et par jour, aucune donnée personnelle
+CREATE TABLE IF NOT EXISTS clics (
+  cible TEXT NOT NULL,
+  jour TEXT NOT NULL,
+  ip_hash TEXT NOT NULL,
+  PRIMARY KEY (cible, jour, ip_hash)
+);
