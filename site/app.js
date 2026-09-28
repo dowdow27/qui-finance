@@ -49,7 +49,7 @@ function buildIndexes() {
 }
 
 /* ---------------- Navigation ---------------- */
-const TABS = ["chercher", "dons", "votations", "parlement", "tendances", "nouveautes"];
+const TABS = ["chercher", "dons", "votations", "parlement", "tendances", "debats", "nouveautes"];
 function route() {
   const [tab, q] = decodeURIComponent(location.hash.slice(1)).split(":");
   const t = TABS.includes(tab) ? tab : "chercher";
@@ -58,6 +58,7 @@ function route() {
   document.querySelector(`.tabs a[data-tab="${t}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
   if (t === "chercher" && q != null && $("#q").value !== q) { $("#q").value = q; search(); }
   if (t === "tendances") renderTrends();
+  if (t === "debats") renderDebats();
 }
 
 /* ---------------- Recherche globale ---------------- */
@@ -110,7 +111,7 @@ function openSheet(type, key) {
   if (type === "org") html = sheetOrg(idx.org.get(key));
   if (type === "vote") html = sheetVote(idx.vote.get(key));
   if (!html) return;
-  body.innerHTML = html; $("#sheet").hidden = false; $(".sheet-panel").scrollTop = 0; $(".close").focus();
+  body.innerHTML = html; ficheDebats(type, key); $("#sheet").hidden = false; $(".sheet-panel").scrollTop = 0; $(".close").focus();
 }
 const closeSheet = () => { $("#sheet").hidden = true; };
 const kpi = (v, l, cls = "") => `<div class="kpi"><b class="${cls}">${esc(v)}</b><span>${esc(l)}</span></div>`;
@@ -377,6 +378,153 @@ function renderHemis() {
   $("#hemis").innerHTML = card("Conseil national", "200 sièges", hemicycle("CN", 200, 8)) + card("Conseil des États", "46 sièges", hemicycle("CE", 46, 4));
 }
 
+/* ---------------- Débats ---------------- */
+const { API = "", TS_KEY = "" } = window.QF || {};
+const DEBAT_TYPES = new Set(["donor", "recip", "elu", "org", "vote"]);
+const REF_LABEL = { donor: "Donateur", recip: "Bénéficiaire", elu: "Élu", org: "Organisation", vote: "Votation" };
+const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* navigation privée */ } } };
+let DEVICE;
+const device = () => DEVICE ||= store.get("qf-device") || (store.set("qf-device", crypto.randomUUID()), store.get("qf-device")) || crypto.randomUUID();
+const dateShort = (s) => (s ? new Date(s.replace(" ", "T") + "Z").toLocaleDateString("fr-CH", { day: "numeric", month: "short", year: "numeric" }) : "");
+
+async function api(path, data) {
+  if (!API) throw new Error("les débats ne sont pas encore ouverts");
+  const r = await fetch(API + path, data ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) } : {});
+  const out = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(out.erreur || "service indisponible");
+  return out;
+}
+let tsLoad, tsId;
+function humanToken() {
+  if (!TS_KEY) return Promise.reject(new Error("anti-robot non configuré"));
+  tsLoad ||= new Promise((ok, ko) => {
+    const s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true;
+    s.onload = () => ok(window.turnstile); s.onerror = () => { tsLoad = null; ko(new Error("anti-robot injoignable")); };
+    document.head.append(s);
+  });
+  return tsLoad.then((ts) => new Promise((ok, ko) => {
+    if (tsId != null) ts.remove(tsId);
+    tsId = ts.render("#ts-box", { sitekey: TS_KEY, appearance: "interaction-only", callback: ok, "error-callback": () => ko(new Error("vérification anti-robot échouée")) });
+  }));
+}
+
+function hypoCard(h) {
+  const refs = h.refs.map((r) => `<button class="chip ref" data-open="${esc(r.type)}" data-key="${esc(r.key)}"><small>${esc(REF_LABEL[r.type] || r.type)}</small> ${esc(r.label)}</button>`).join("");
+  return `<article class="hypo" data-hid="${h.id}">
+    <div class="votebox" role="group" aria-label="Voter">
+      <button class="vbtn up" data-vote="1" aria-pressed="${h.mon_vote === 1}" aria-label="Hypothèse fondée">▲</button>
+      <b class="score">${h.score}</b>
+      <button class="vbtn down" data-vote="-1" aria-pressed="${h.mon_vote === -1}" aria-label="Hypothèse pas fondée">▼</button>
+    </div>
+    <div class="hypo-body"><h3>${esc(h.titre)}</h3>
+      <p class="meta">${esc(h.pseudo)}, ${esc(dateShort(h.publie_le))} · <span class="counts">${h.pour} pour, ${h.contre} contre</span> <span class="vmsg" role="status"></span></p>
+      <p class="texte">${esc(h.texte)}</p><div class="chips">${refs}</div>
+      <button class="link" data-com="${h.id}">${h.n_com ? `${h.n_com} commentaire${h.n_com > 1 ? "s" : ""}` : "Commenter"}</button><div class="coms" hidden></div>
+    </div></article>`;
+}
+async function renderDebats() {
+  const box = $("#l-debats");
+  if (!API) { box.innerHTML = `<p class="empty">Les débats ouvrent bientôt.</p>`; return; }
+  box.innerHTML = `<p class="note">Chargement…</p>`;
+  try {
+    const { hypotheses } = await api(`/hypotheses?tri=${$("#fdb-tri").value}&d=${device()}`);
+    box.innerHTML = hypotheses.map(hypoCard).join("") || `<p class="empty">Aucune hypothèse publiée pour l'instant. Proposez la première !</p>`;
+  } catch (e) { box.innerHTML = `<p class="empty">Débats momentanément indisponibles : ${esc(e.message)}.</p>`; }
+}
+function ficheDebats(type, key) {
+  if (!API || !DEBAT_TYPES.has(type)) return;
+  const ref = `${type}:${key}`, body = $("#sheet-body");
+  body.dataset.ref = ref;
+  body.insertAdjacentHTML("beforeend", `<section class="fiche-debats"><h3>Hypothèses sur cette fiche</h3><div class="fd-list"><p class="note">Chargement…</p></div>
+    <button class="btn ghost" data-propose="${esc(ref)}">Proposer une hypothèse</button></section>`);
+  api(`/hypotheses?ref=${encodeURIComponent(ref)}&d=${device()}`).then(({ hypotheses }) => {
+    if (body.dataset.ref !== ref) return;  // une autre fiche a été ouverte entre-temps
+    $(".fd-list", body).innerHTML = hypotheses.map(hypoCard).join("") || `<p class="note">Aucune hypothèse publiée sur cette fiche.</p>`;
+  }).catch(() => { if (body.dataset.ref === ref) $(".fd-list", body).innerHTML = `<p class="note">Débats momentanément indisponibles.</p>`; });
+}
+
+/* Proposer une hypothèse */
+let PROP = [];
+function refFromKey(ref) {
+  const [type, ...rest] = ref.split(":"); const key = rest.join(":");
+  const label = { donor: () => idx.donor.get(key)?.nom, recip: () => idx.recip.get(key)?.nom, org: () => idx.org.get(key)?.nom,
+    elu: () => idx.elu.get(Number(key))?.nom, vote: () => idx.vote.get(key)?.titre }[type]?.();
+  return label ? { type, key, label } : null;
+}
+function searchRefs(q) {
+  const t = norm(q).split(" ").filter(Boolean); if (!t.length) return [];
+  const pick = (type, arr, key, label, n) => arr.filter((x) => matchAll(x._n, t)).slice(0, n).map((x) => ({ type, key: String(key(x)), label: label(x) }));
+  return [...pick("vote", V, (v) => v.id, (v) => v.titre, 3), ...pick("elu", L.elus, (e) => e.id, (e) => e.nom, 3),
+    ...pick("donor", [...idx.donor.values()], (g) => g.nom, (g) => g.nom, 3), ...pick("org", [...idx.org.values()], (o) => o.nom, (o) => o.nom, 3),
+    ...pick("recip", [...idx.recip.values()], (r) => r.nom, (r) => r.nom, 2)];
+}
+function renderPropRefs() {
+  $("#p-refs").innerHTML = PROP.map((r, i) => `<span class="chip ref"><small>${esc(REF_LABEL[r.type])}</small> ${esc(r.label)} <button type="button" class="x" data-delref="${i}" aria-label="Retirer ${esc(r.label)}">×</button></span>`).join("")
+    || `<span class="note">Aucune fiche citée pour l'instant.</span>`;
+}
+function openPropose(pref) {
+  PROP = []; const r = pref && refFromKey(pref); if (r) PROP.push(r);
+  const body = $("#sheet-body"); delete body.dataset.ref;
+  body.innerHTML = `<h2>Proposer une hypothèse</h2>
+  <p class="note">Formulez une hypothèse ou une question que les données permettent de discuter, et citez au moins une fiche du site. Tout est relu avant publication : pas d'accusation, pas d'attaque personnelle.</p>
+  ${API ? `<form id="f-propose" class="form">
+    <label>Pseudo <input name="pseudo" required minlength="2" maxlength="40" autocomplete="nickname" value="${esc(store.get("qf-pseudo") || "")}"></label>
+    <label>Hypothèse <input name="titre" required minlength="10" maxlength="140" placeholder="Ex. : les assureurs financent surtout le non aux votations sur la santé"></label>
+    <label>Ce que montrent les données <textarea name="texte" required minlength="20" maxlength="2000" rows="6" placeholder="Chiffres, fiches, comparaisons…"></textarea></label>
+    <fieldset><legend>Fiches citées (au moins une)</legend><div class="chips" id="p-refs"></div>
+      <input id="p-ref-q" type="search" placeholder="Chercher un donateur, un élu, une votation…" autocomplete="off" aria-label="Ajouter une fiche"><div id="p-ref-res" class="ref-res"></div></fieldset>
+    <p class="form-msg" id="p-msg" role="status"></p>
+    <button class="btn" type="submit">Envoyer pour relecture</button></form>` : `<p class="empty">Les débats ouvrent bientôt.</p>`}`;
+  $("#sheet").hidden = false; $(".sheet-panel").scrollTop = 0;
+  if (API) renderPropRefs();
+}
+async function submitPropose(form) {
+  const msg = $("#p-msg"), btn = $("button[type=submit]", form), f = new FormData(form);
+  if (!PROP.length) { msg.textContent = "Citez au moins une fiche du site."; $("#p-ref-q").focus(); return; }
+  btn.disabled = true; msg.textContent = "Vérification…";
+  try {
+    const turnstile = await humanToken();
+    await api("/hypotheses", { pseudo: f.get("pseudo"), titre: f.get("titre"), texte: f.get("texte"), refs: PROP, turnstile });
+    store.set("qf-pseudo", f.get("pseudo"));
+    form.outerHTML = `<p class="empty">Merci ! Votre hypothèse sera publiée après relecture.</p>`;
+  } catch (e) { msg.textContent = `Envoi impossible : ${e.message}.`; btn.disabled = false; }
+}
+
+/* Votes et commentaires */
+async function castVote(btn) {
+  const art = btn.closest(".hypo"), id = art.dataset.hid, v = +btn.dataset.vote;
+  const valeur = btn.getAttribute("aria-pressed") === "true" ? 0 : v;
+  const btns = art.querySelectorAll(".vbtn"), vmsg = $(".vmsg", art);
+  btns.forEach((b) => (b.disabled = true)); vmsg.textContent = "";
+  try {
+    const r = await api(`/hypotheses/${id}/vote`, { valeur, device: device(), turnstile: await humanToken() });
+    $(".score", art).textContent = r.score; $(".counts", art).textContent = `${r.pour} pour, ${r.contre} contre`;
+    btns.forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.vote === r.mon_vote)));
+  } catch (e) { vmsg.textContent = `Vote impossible : ${e.message}`; }
+  btns.forEach((b) => (b.disabled = false));
+}
+async function toggleComs(btn) {
+  const box = btn.nextElementSibling, id = btn.dataset.com;
+  if (!box.hidden) { box.hidden = true; return; }
+  box.hidden = false; box.innerHTML = `<p class="note">Chargement…</p>`;
+  try {
+    const h = await api(`/hypotheses/${id}`);
+    box.innerHTML = `<ul class="list">${h.commentaires.map((c) => `<li><span><strong>${esc(c.pseudo)}</strong> <small class="note">${esc(dateShort(c.publie_le))}</small></span><span></span><span class="sub texte">${esc(c.texte)}</span></li>`).join("")}</ul>
+      <form class="form f-com" data-hid="${id}"><label>Pseudo <input name="pseudo" required minlength="2" maxlength="40" value="${esc(store.get("qf-pseudo") || "")}"></label>
+      <label>Commentaire <textarea name="texte" required minlength="2" maxlength="1000" rows="3"></textarea></label><p class="form-msg" role="status"></p><button class="btn ghost" type="submit">Envoyer pour relecture</button></form>`;
+  } catch (e) { box.innerHTML = `<p class="note">Commentaires indisponibles : ${esc(e.message)}.</p>`; }
+}
+async function submitCom(form) {
+  const msg = $(".form-msg", form), btn = $("button[type=submit]", form), f = new FormData(form);
+  btn.disabled = true; msg.textContent = "Vérification…";
+  try {
+    await api(`/hypotheses/${form.dataset.hid}/commentaires`, { pseudo: f.get("pseudo"), texte: f.get("texte"), turnstile: await humanToken() });
+    store.set("qf-pseudo", f.get("pseudo"));
+    form.outerHTML = `<p class="note">Merci ! Votre commentaire sera publié après relecture.</p>`;
+  } catch (e) { msg.textContent = `Envoi impossible : ${e.message}.`; btn.disabled = false; }
+}
+
 /* ---------------- Tendances ---------------- */
 function renderTrends() {
   if (!$("#ft-an")) {
@@ -460,13 +608,28 @@ document.addEventListener("click", (ev) => {
   if (ev.target.closest("[data-close]")) { closeSheet(); return; }
   const q = ev.target.closest("[data-q]"); if (q) { $("#q").value = q.dataset.q; search(); return; }
   const dq = ev.target.closest("[data-dons-q]"); if (dq) { location.hash = "#dons"; $("#fd-q").value = dq.dataset.donsQ; renderDons(); return; }
+  const pr = ev.target.closest("[data-propose]"); if (pr) { openPropose(pr.dataset.propose); return; }
+  const vb = ev.target.closest("[data-vote]"); if (vb) { castVote(vb); return; }
+  const cm = ev.target.closest("[data-com]"); if (cm) { toggleComs(cm); return; }
+  const ar = ev.target.closest("[data-addref]"); if (ar) { const r = refFromKey(ar.dataset.addref); if (r && PROP.length < 6 && !PROP.some((x) => x.type === r.type && x.key === r.key)) PROP.push(r); renderPropRefs(); $("#p-ref-q").value = ""; $("#p-ref-res").innerHTML = ""; $("#p-ref-q").focus(); return; }
+  const dr = ev.target.closest("[data-delref]"); if (dr) { PROP.splice(+dr.dataset.delref, 1); renderPropRefs(); return; }
   const s = ev.target.closest("[data-sort]"); if (s) { const [t, k] = s.dataset.sort.split(":"); const st = state[t]; st.dir = st.sort === k ? -st.dir : -1; st.sort = k; st.page = 0; (t === "dons" ? renderDons : renderParl)(); }
 });
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeSheet(); });
+document.addEventListener("submit", (ev) => {
+  if (ev.target.id === "f-propose") { ev.preventDefault(); submitPropose(ev.target); }
+  else if (ev.target.classList.contains("f-com")) { ev.preventDefault(); submitCom(ev.target); }
+});
+document.addEventListener("input", (ev) => {
+  if (ev.target.id !== "p-ref-q") return;
+  $("#p-ref-res").innerHTML = searchRefs(ev.target.value).map((r) => `<button type="button" class="ref-hit" data-addref="${esc(r.type)}:${esc(r.key)}"><small>${esc(REF_LABEL[r.type])}</small> ${esc(r.label)}</button>`).join("");
+});
 
 (async function init() {
   [M, A, L, C, T, V] = await Promise.all([getJSON("meta", {}), getJSON("argent", { dons: [], campagnes: [] }), getJSON("lobby", { elus: [], liens: [], badges: [] }), getJSON("changes", []), getJSON("timeline", []), getJSON("votations", [])]);
   buildIndexes(); status(); suggestions(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
+  $("#fdb-tri").addEventListener("input", renderDebats);
+  if (!API) $('.tabs a[data-tab="debats"]').hidden = true;  // onglet masqué tant que l'API n'est pas configurée (site/config.js)
   let timer; $("#q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(search, 120); });
   window.addEventListener("hashchange", route); route();
 })();

@@ -1,0 +1,11 @@
+# API des débats de « Qui finance ? » : Cloudflare Worker + D1.
+# Secrets (npx wrangler secret put <NOM>, jamais dans le repo) : TURNSTILE_SECRET, ADMIN_TOKEN, HASH_SALT.
+# En local, ils viennent de .dev.vars (non versionné, clés de test Turnstile).
+name = "qui-finance-debats"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "qui-finance-debats"
+database_id = "00000000-0000-0000-0000-000000000000"  # remplacé après « wrangler d1 create »

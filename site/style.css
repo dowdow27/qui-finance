@@ -188,6 +188,42 @@ svg.hemi .seat:hover { stroke: var(--ink); stroke-width: 1.2; }
 .portrait img { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; object-position: top; display: block; background: var(--card); }
 .portrait figcaption { font-size: .7rem; color: var(--muted); margin-top: 3px; }
 
+/* Débats */
+.charte { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 10px 14px; margin: 0 0 18px; max-width: 70ch; }
+.charte summary { cursor: pointer; font-weight: 700; }
+.charte ul { margin: 10px 0 4px; padding-left: 18px; color: var(--muted); }
+.hypo { display: grid; grid-template-columns: auto 1fr; gap: 14px; background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 14px; margin: 0 0 10px; }
+.votebox { display: grid; justify-items: center; align-content: start; gap: 2px; min-width: 40px; }
+.vbtn { font: inherit; font-size: 1rem; width: 40px; height: 36px; border-radius: var(--radius-s); border: 1px solid var(--rule); background: var(--paper); color: var(--muted); cursor: pointer; }
+.vbtn:hover { border-color: var(--ink); color: var(--ink); }
+.vbtn.up[aria-pressed="true"] { background: var(--infl); border-color: var(--infl); color: var(--card); }
+.vbtn.down[aria-pressed="true"] { background: var(--money); border-color: var(--money); color: var(--card); }
+.vbtn:disabled { opacity: .5; cursor: wait; }
+.votebox .score { font-size: 1.15rem; }
+.hypo-body { min-width: 0; }
+.hypo-body h3 { margin: 0 0 2px; }
+.hypo .meta { color: var(--muted); font-size: .85rem; margin: 0 0 8px; }
+.vmsg { color: var(--money); }
+.texte { white-space: pre-line; overflow-wrap: anywhere; margin: 0 0 10px; }
+.chips.chips { margin: 0 0 10px; }
+.chip.ref { font-size: .82rem; padding: 3px 10px; text-align: left; }
+.chip.ref small { color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: .68rem; letter-spacing: .04em; }
+.chip .x { all: unset; cursor: pointer; margin-left: 4px; font-weight: 700; padding: 0 4px; }
+.coms { margin-top: 8px; }
+.fiche-debats .hypo { background: var(--paper); }
+.form { display: grid; gap: 12px; margin: 10px 0; }
+.form label { display: grid; gap: 4px; font-weight: 500; font-size: .92rem; }
+.form input, .form textarea { font: inherit; padding: 9px 12px; border: 1px solid var(--rule); border-radius: var(--radius-s); background: var(--card); color: var(--ink); width: 100%; }
+.form fieldset { border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 10px 12px; margin: 0; display: grid; gap: 8px; }
+.form legend { font-weight: 500; font-size: .92rem; padding: 0 4px; }
+.form .btn { justify-self: start; }
+.form-msg { margin: 0; color: var(--muted); min-height: 1.2em; }
+.ref-res { display: grid; gap: 4px; }
+.ref-hit { all: unset; cursor: pointer; padding: 6px 10px; border-radius: var(--radius-s); background: var(--card); border: 1px solid var(--rule); }
+.ref-hit:hover, .ref-hit:focus-visible { border-color: var(--ink); }
+.ref-hit small { color: var(--muted); font-weight: 700; margin-right: 4px; }
+.ts-box { position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 40; }
+
 /* Nouveautés */
 .week { border-top: 2px solid var(--ink); padding: 14px 0 24px; }
 .week h3 { font-size: 1.2rem; }

@@ -25,6 +25,16 @@ Un site qui réunit, cherche et compare deux registres publics, mis à jour auto
 
 Le site est alors en ligne à l'adresse `https://<ton-compte>.github.io/<nom-du-depot>/` et se met à jour tout seul chaque lundi.
 
+## Débats (hypothèses fondées sur les données)
+
+Onglet « Débats » : chacun propose une hypothèse qui cite au moins une fiche du site, vote pour ou contre, commente. Rien n'est publié sans validation sur `site/admin.html`.
+
+- API : Cloudflare Worker + D1 dans `worker/` (JavaScript sans dépendance). Anti-robot : Cloudflare Turnstile.
+- Aucune donnée personnelle en clair : pas de compte ni d'email, l'adresse IP n'est conservée que sous forme d'empreinte salée (limite de 5 contributions par jour, votes plafonnés par connexion).
+- Configuration publique (adresse de l'API, sitekey Turnstile) : `site/config.js`. L'onglet reste masqué tant qu'elle est vide.
+- Secrets du Worker (`npx wrangler secret put`) : `TURNSTILE_SECRET`, `ADMIN_TOKEN`, `HASH_SALT`.
+- En local : `npx wrangler d1 execute qui-finance-debats --local --file worker/schema.sql`, puis `npx wrangler dev --config worker/wrangler.toml` et `cd site && python3 -m http.server 8000` (clés de test Turnstile dans `worker/.dev.vars`, non versionné).
+
 ## Adapter les catégories
 
 - `config/secteurs.csv` : classe les donateurs par secteur (« motif;secteur », le motif est une expression régulière sur le nom en minuscules, sans accents). Les donateurs non couverts sont classés via Lobbywatch quand leur nom y figure.

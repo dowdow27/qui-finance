@@ -1,0 +1,39 @@
+-- Débats : hypothèses fondées sur les données du site. Aucune IP ni email en clair.
+CREATE TABLE IF NOT EXISTS hypotheses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pseudo TEXT NOT NULL,
+  titre TEXT NOT NULL,
+  texte TEXT NOT NULL,
+  refs TEXT NOT NULL,                 -- JSON : [{type, key, label}], clés de openSheet() dans site/app.js
+  statut TEXT NOT NULL DEFAULT 'attente' CHECK (statut IN ('attente', 'publie', 'refuse')),
+  motif_refus TEXT,
+  auteur_hash TEXT NOT NULL,          -- sha256(sel + IP), pour limiter le débit
+  cree_le TEXT NOT NULL DEFAULT (datetime('now')),
+  publie_le TEXT
+);
+CREATE INDEX IF NOT EXISTS hyp_statut ON hypotheses (statut, publie_le);
+CREATE INDEX IF NOT EXISTS hyp_auteur ON hypotheses (auteur_hash, cree_le);
+
+CREATE TABLE IF NOT EXISTS commentaires (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  hypothese_id INTEGER NOT NULL REFERENCES hypotheses (id) ON DELETE CASCADE,
+  pseudo TEXT NOT NULL,
+  texte TEXT NOT NULL,
+  statut TEXT NOT NULL DEFAULT 'attente' CHECK (statut IN ('attente', 'publie', 'refuse')),
+  motif_refus TEXT,
+  auteur_hash TEXT NOT NULL,
+  cree_le TEXT NOT NULL DEFAULT (datetime('now')),
+  publie_le TEXT
+);
+CREATE INDEX IF NOT EXISTS com_hyp ON commentaires (hypothese_id, statut);
+CREATE INDEX IF NOT EXISTS com_auteur ON commentaires (auteur_hash, cree_le);
+
+CREATE TABLE IF NOT EXISTS votes (
+  hypothese_id INTEGER NOT NULL REFERENCES hypotheses (id) ON DELETE CASCADE,
+  votant_hash TEXT NOT NULL,          -- sha256(sel + identifiant d'appareil)
+  ip_hash TEXT NOT NULL,
+  valeur INTEGER NOT NULL CHECK (valeur IN (-1, 1)),
+  cree_le TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (hypothese_id, votant_hash)
+);
+CREATE INDEX IF NOT EXISTS vote_ip ON votes (hypothese_id, ip_hash);

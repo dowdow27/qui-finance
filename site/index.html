@@ -21,6 +21,7 @@
       <a href="#votations" data-tab="votations">Votations</a>
       <a href="#parlement" data-tab="parlement">Parlement</a>
       <a href="#tendances" data-tab="tendances">Tendances</a>
+      <a href="#debats" data-tab="debats">Débats</a>
       <a href="#nouveautes" data-tab="nouveautes">Nouveautés</a>
     </nav>
   </div>
@@ -74,6 +75,26 @@
     <div class="grid" id="charts"></div>
   </section>
 
+  <section id="tab-debats" class="tab" hidden>
+    <h2>Débats</h2>
+    <p class="note">Proposez une hypothèse que les données du site permettent de discuter, votez pour celles qui vous semblent fondées, débattez. Chaque hypothèse cite au moins une fiche du site.</p>
+    <details class="charte">
+      <summary>Charte : à lire avant de participer</summary>
+      <ul>
+        <li>Partez des données : citez les fiches qui soutiennent votre hypothèse.</li>
+        <li>Formulez une hypothèse ou une question, pas une accusation. Un don ou un mandat n'est pas une preuve de corruption.</li>
+        <li>Pas d'attaque personnelle, pas d'insulte, rien sur la vie privée.</li>
+        <li>Tout est relu avant publication. Une contribution peut être refusée ou retirée.</li>
+        <li>Aucun compte ni email. Votre adresse IP n'est jamais stockée en clair (empreinte chiffrée, uniquement contre les abus). Protection anti-robot par Cloudflare Turnstile.</li>
+      </ul>
+    </details>
+    <div class="filters" id="f-debats">
+      <select id="fdb-tri" aria-label="Tri"><option value="top">Les mieux notées</option><option value="recent">Les plus récentes</option></select>
+      <button class="btn" data-propose="">Proposer une hypothèse</button>
+    </div>
+    <div id="l-debats"></div>
+  </section>
+
   <section id="tab-nouveautes" class="tab" hidden>
     <h2>Nouveautés</h2>
     <p class="note">Ce qui a changé à chaque mise à jour hebdomadaire : nouveaux dons publiés, nouveaux mandats, mandats terminés.</p>
@@ -89,10 +110,13 @@
   </article>
 </div>
 
+<div id="ts-box" class="ts-box" aria-live="polite"></div>
+
 <footer class="foot wrap">
   <p id="status"></p>
-  <p>Sources : <a href="https://politikfinanzierung.efk.admin.ch">Contrôle fédéral des finances (CDF), transparence du financement de la vie politique</a>, via <a href="https://github.com/lgnbhl/swiss-political-financing">swiss-political-financing</a> (« Open use »). <a href="https://lobbywatch.ch">Lobbywatch.ch</a> (CC BY-SA 4.0). Votations : <a href="https://swissvotes.ch">Swissvotes, Année politique suisse, Université de Berne</a> (CC BY 4.0) et <a href="https://www.bfs.admin.ch">Office fédéral de la statistique</a> (« Open use »). Photos des élus : © ParlCH. Les rapprochements par secteur sont automatiques et peuvent contenir des erreurs. Un lien d'intérêt n'est pas une faute : c'est une information.</p>
+  <p>Sources : <a href="https://politikfinanzierung.efk.admin.ch">Contrôle fédéral des finances (CDF), transparence du financement de la vie politique</a>, via <a href="https://github.com/lgnbhl/swiss-political-financing">swiss-political-financing</a> (« Open use »). <a href="https://lobbywatch.ch">Lobbywatch.ch</a> (CC BY-SA 4.0). Votations : <a href="https://swissvotes.ch">Swissvotes, Année politique suisse, Université de Berne</a> (CC BY 4.0) et <a href="https://www.bfs.admin.ch">Office fédéral de la statistique</a> (« Open use »). Photos des élus : © ParlCH. Débats : aucune donnée personnelle collectée hors une empreinte chiffrée de l'adresse IP (lutte contre les abus) ; demande de retrait via <a href="https://github.com/dowdow27/qui-finance/issues">GitHub</a>. Les rapprochements par secteur sont automatiques et peuvent contenir des erreurs. Un lien d'intérêt n'est pas une faute : c'est une information.</p>
 </footer>
+<script src="config.js"></script>
 <script src="app.js" defer></script>
 </body>
 </html>
