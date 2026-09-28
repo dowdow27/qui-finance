@@ -97,9 +97,14 @@ a { color: var(--infl); }
 .promo-card { border-top-color: var(--infl); }
 .home-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
 .spot { border-top-color: var(--ink); }
-.spot .elu-card-head { margin: 2px 0 6px; }
-.spot .kpis.small { margin: 4px 0 8px; }
-.presse li a { font-weight: 500; }
+.spot-list { list-style: none; margin: 0; padding: 0; }
+.spot-row { padding: 10px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 4px; }
+.spot-row:last-child { border-bottom: 0; }
+.spot .elu-card-head { gap: 10px; }
+.spot .elu-card-head img { width: 44px; height: 44px; }
+.spot-kpi { margin: 0; font-size: .9rem; color: var(--muted); }
+.spot-art { margin: 0; font-size: .95rem; }
+.spot-art a { font-weight: 500; }
 .search-big input {
   width: 100%; font: inherit; font-size: clamp(1.2rem, 3.5vw, 1.6rem); font-weight: 500;
   padding: 18px 20px; border: 2px solid var(--ink); border-radius: var(--radius-l);

@@ -1090,20 +1090,24 @@ async function renderSpotlight() {
   const byElu = new Map();
   for (const a of presse) { const e = idx.elu.get(a.elu); if (e) { if (!byElu.has(e)) byElu.set(e, []); byElu.get(e).push(a); } }
   const seed = Math.floor(Date.parse((M.genere || new Date().toISOString()).slice(0, 10)) / 864e5);
-  let e, arts = [];
-  if (byElu.size) { const c = [...byElu.entries()].sort((a, b) => b[1][0].date.localeCompare(a[1][0].date) || b[1].length - a[1].length); [e, arts] = c[seed % Math.min(c.length, 5)]; }
-  else if (L.elus.length) e = L.elus[seed % L.elus.length];
-  if (!e) { box.remove(); return; }
-  const paid = e.liens.filter((l) => l.statut === "remunere").length, lp = liensPotentiels().find((x) => x.e === e);
-  const head = (st) => `<section class="card une-card spot"><p class="eyebrow-s">${arts.length ? "Dans l'actualité" : "L'élu du jour"}</p>
-    <button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="56" height="56" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.canton)} · ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"}</small></span></button>
-    <div class="kpis small">${kpi(e.liens.length, "mandats")}${kpi(paid, "rémunérés", paid ? "money" : "")}${st ? kpi(pctInt(st.participation), "présence aux votes") : ""}${e.badges.length ? kpi(e.badges.length, "badges donnés") : ""}</div>
-    ${lp ? `<p class="note">${lp.n} lien${lp.n > 1 ? "s" : ""} d'intérêts potentiel${lp.n > 1 ? "s" : ""} : ${lpLine(lp.hits[0])}.</p>` : ""}
-    ${arts.length ? `<ul class="list presse">${arts.slice(0, 3).map((a) => `<li><span><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.titre)}</a></span><span class="sub">${esc(a.source)} · ${esc(dateFr(a.date))}</span></li>`).join("")}</ul><p class="note">Articles des 14 derniers jours qui citent cet élu (flux RSS). Le site ne commente pas la presse : il met la fiche à côté.</p>`
-      : `<p class="note">Chaque jour, un élu tiré au sort parmi les ${L.elus.length}. Quand la presse cite un parlementaire, il prend la place.</p>`}
-    <span class="go">${linkBtn("elu", e.id, "Voir la fiche →")}</span></section>`;
-  box.outerHTML = head(null); 
-  const p = await loadParl(); const st = p?.elus[e.id]; if (st) $(".spot")?.replaceWith(Object.assign(document.createElement("div"), { innerHTML: head(st) }).firstElementChild);
+  let picks = [];  // [[élu, articles], …] : trois élus au plus, décalés chaque jour
+  if (byElu.size) {  // trois élus, décalés chaque jour, de partis différents quand c'est possible
+    const c = [...byElu.entries()].sort((a, b) => b[1][0].date.localeCompare(a[1][0].date) || b[1].length - a[1].length), off = seed % c.length;
+    const ordre = c.map((_, i) => c[(off + i) % c.length]), partis = new Set();
+    for (const x of ordre) if (picks.length < 3 && !partis.has(x[0].parti)) { picks.push(x); partis.add(x[0].parti); }
+    for (const x of ordre) if (picks.length < 3 && !picks.includes(x)) picks.push(x);
+  }
+  else if (L.elus.length) picks = [[L.elus[seed % L.elus.length], []]];
+  if (!picks.length) { box.remove(); return; }
+  const presseMode = byElu.size > 0;
+  const row = ([e, arts], st) => { const paid = e.liens.filter((l) => l.statut === "remunere").length, lp = liensPotentiels().find((x) => x.e === e), a = arts[0];
+    return `<li class="spot-row"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="44" height="44" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${esc(e.canton)} · ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"}</small></span></button>
+      <p class="spot-kpi">${e.liens.length} mandats, <b class="${paid ? "money" : ""}">${paid} rémunérés</b>${st ? `, présence aux votes ${pctInt(st.participation)}` : ""}${lp ? `, ${lp.n} lien${lp.n > 1 ? "s" : ""} d'intérêts potentiel${lp.n > 1 ? "s" : ""}` : ""}.</p>
+      ${a ? `<p class="spot-art"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.titre)}</a> <small class="note">${esc(a.source)} · ${esc(dateFr(a.date))}${arts.length > 1 ? ` · et ${arts.length - 1} autre${arts.length > 2 ? "s" : ""} article${arts.length > 2 ? "s" : ""}` : ""}</small></p>` : ""}</li>`; };
+  const html = (p) => `<section class="card une-card spot"><p class="eyebrow-s">${presseMode ? "Dans l'actualité" : "L'élu du jour"}</p><ul class="spot-list">${picks.map((x) => row(x, p?.elus[x[0].id])).join("")}</ul>
+    <p class="note">${presseMode ? "Élus cités par la presse ces 14 derniers jours (flux RSS), trois par jour. Le site ne commente pas l'article : il met la fiche à côté." : `Chaque jour, un élu tiré au sort parmi les ${L.elus.length}. Quand la presse cite un parlementaire, il prend la place.`}</p></section>`;
+  box.outerHTML = html(null);
+  const p = await loadParl(); if (p) { const t = document.createElement("div"); t.innerHTML = html(p); $(".spot")?.replaceWith(t.firstElementChild); }
 }
 
 /* ---------------- À la une (accueil) ---------------- */
