@@ -1,6 +1,6 @@
 # Qui finance la politique suisse ?
 
-Un site qui réunit, cherche et compare deux registres publics, mis à jour automatiquement chaque lundi :
+On ne choisit ni son canton ni les objets soumis au vote, mais on peut voir qui les paie. Le site montre l'argent derrière vos élus (mandats, donateurs, présence, votes) et derrière chaque votation fédérale (budgets du oui et du non), à partir de registres publics mis à jour automatiquement chaque lundi :
 
 | Registre | Contenu | Source |
 | --- | --- | --- |
@@ -15,7 +15,7 @@ Un site qui réunit, cherche et compare deux registres publics, mis à jour auto
 
 Six entrées : **Chercher** (accueil), **Classements** (avec Absences et Lobbyistes), **Jouer**, **Explorer** (Dons, Votations, Parlement, Réseaux, Nouveautés), **S'engager** et **Débats**.
 
-- **Accueil** : « Dans l'actualité » (un élu cité par la presse des 14 derniers jours, flux RSS, avec sa fiche à côté ; sinon l'élu du jour tiré au sort), la question de la semaine (un chiffre du site, une question de fond, un sondage oui/non ; le site donne les chiffres, les lecteurs tranchent, puis défendent leur position dans les Débats), la prochaine votation et l'argent déclaré par chaque camp, le jeu « Vous votez comme quel élu ? », puis la recherche.
+- **Accueil** : votre canton et vos élus (mandats rémunérés, présence aux votes, votes contre le parti, liens d'intérêts potentiels, votre confiance), la prochaine et la dernière votation avec l'argent de chaque camp, puis « Dans l'actualité » (un élu cité par la presse des 14 derniers jours, flux RSS, avec sa fiche à côté ; sinon l'élu du jour tiré au sort), la question de la semaine (un chiffre du site, une question de fond, un sondage oui/non ; le site donne les chiffres, les lecteurs tranchent, puis défendent leur position dans les Débats), la prochaine votation et l'argent déclaré par chaque camp, le jeu « Vous votez comme quel élu ? », puis la recherche.
 - **Cote de confiance** : « Faites-vous confiance à cet élu ? » Un vote par personne et par élu, modifiable, résultats publics sur l'accueil (par canton), sur chaque fiche et en classement par parti. Un élu entre dans les classements à partir de 10 votes. Ce n'est pas un sondage représentatif : ce sont les lecteurs du site.
 - **S'engager** : voter (ch.ch, easyvote, smartvote), interpeller, adhérer ou donner. Liens officiels de chaque parti représenté aux Chambres (`site/partis.json`, à compléter), même format pour tous, ordre par sièges. Les clics sont comptés sans donnée personnelle et le compteur est public.
 - **Chercher** : une seule barre pour les donateurs, bénéficiaires, élus, organisations et titulaires de badges. Chaque résultat ouvre une fiche, avec les liens croisés (une entreprise qui donne de l'argent ET qui a des élus dans ses conseils).

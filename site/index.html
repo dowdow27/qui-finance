@@ -16,7 +16,7 @@
   <div class="wrap top-inner">
     <a class="brand" href="#chercher">Qui finance ?</a>
     <nav class="tabs" aria-label="Sections">
-      <a href="#chercher" data-tab="chercher">Chercher</a>
+      <a href="#chercher" data-tab="chercher">Accueil</a>
       <a href="#tendances" data-tab="tendances" data-group="tendances absences lobbyistes">Classements</a>
       <a href="#jouer" data-tab="jouer">Jouer</a>
       <a href="#dons" data-tab="dons" data-group="dons votations parlement reseaux trends nouveautes">Données</a>
@@ -29,21 +29,19 @@
 <main class="wrap">
   <section id="tab-chercher" class="tab">
     <p class="eyebrow">Transparence démocratique</p>
-    <h1 class="hero">Qui finance qui<br>dans la politique suisse ?</h1>
-    <p class="lede">L'argent des partis, les mandats des élus et leurs votes, croisés à partir des registres officiels. Le site donne les chiffres. À vous de trancher.</p>
+    <h1 class="hero">Qui paie vos élus ?<br>Qui paie le oui et le non ?</h1>
+    <p class="lede">Vous ne choisissez ni votre canton ni les objets soumis au vote. Ici, vous voyez l'argent derrière les deux : les mandats et les donateurs de vos élus, les budgets de campagne de chaque votation.</p>
+    <section class="card mes-elus" id="mes-elus" aria-label="Vos élus"><p class="note">Chargement…</p></section>
+    <section class="card vot-home" id="vot-home" aria-label="Votations fédérales"><p class="note">Chargement…</p></section>
+    <section class="card qsem" id="qsem" aria-label="La question de la semaine"><p class="note">Chargement…</p></section>
+    <div id="spot"></div>
+    <h2 class="h-search">Chercher un nom</h2>
     <label class="search-big">
       <span class="sr">Recherche</span>
       <input id="q" type="search" placeholder="Un donateur, un élu, un parti, un lobby…" autocomplete="off">
     </label>
     <div class="chips row" id="suggest"></div>
     <div id="results"></div>
-    <section class="card qsem" id="qsem" aria-label="La question de la semaine"><p class="note">Chargement…</p></section>
-    <div class="grid home-grid">
-      <div id="prochaine"></div>
-      <a class="card une-card promo-card" href="#jouer:match"><p class="eyebrow-s">Jouer</p><h3>Vous votez comme quel élu ?</h3><p class="note">Dix vrais votes du Conseil national. Le site vous dit quels élus votent comme vous, et qui les finance.</p><span class="go">Jouer →</span></a>
-      <section class="card une-card conf" id="conf" aria-label="Cote de confiance"><p class="note">Chargement…</p></section>
-    </div>
-    <div id="spot"></div>
     <div class="grid une" id="une"></div>
     <p class="note more-links">Aussi : <a href="#engager">S'engager</a><a href="#debats">Débats</a><a href="#nouveautes">Nouveautés</a><a href="#reseaux">Réseaux</a></p>
     <p class="note" id="news-line" hidden></p>

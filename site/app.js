@@ -1074,17 +1074,43 @@ async function voteSondage(btn) {
   btns.forEach((b) => (b.disabled = false));
 }
 
-/* ---------------- Prochaine votation (accueil) ---------------- */
-function renderProchaine() {
-  const box = $("#prochaine"); if (!box) return;
+/* ---------------- Accueil : vos élus ---------------- */
+/* La promesse du site : on ne choisit ni son canton ni les objets soumis au vote, mais on peut voir qui les paie. */
+async function renderMesElus() {
+  const box = $("#mes-elus"); if (!box) return;
+  const cantons = uniq(L.elus.map((e) => e.canton)).sort(), canton = cantons.includes(store.get("qf-canton")) ? store.get("qf-canton") : "";
+  const elus = L.elus.filter((e) => e.canton === canton).sort((a, b) => (a.conseil === "CE" ? 0 : 1) - (b.conseil === "CE" ? 0 : 1) || a.nom.localeCompare(b.nom));
+  const head = (body) => `<p class="eyebrow-s">Vos élus</p>
+    <div class="filters conf-filters"><label class="canton-pick">${canton ? armoiries(canton, 34) : ""}<span class="sr">Canton</span><select id="home-canton"><option value="">Votre canton…</option>${cantons.map((c) => `<option value="${c}"${c === canton ? " selected" : ""}>${c}</option>`).join("")}</select></label>${canton ? `<span class="summary">${elus.length} élus fédéraux, ${elus.filter((e) => e.conseil === "CE").length} aux États et ${elus.filter((e) => e.conseil === "CN").length} au National</span>` : ""}</div>${body}`;
+  if (!canton) { box.innerHTML = head(`<p class="note">Choisissez votre canton : vos conseillers aux États et nationaux, qui les paie, comment ils votent, s'ils sont présents. Et dites si vous leur faites confiance : un vote par personne et par élu, résultat public.</p>${stamp("Lobbywatch, Services du Parlement")}`); return; }
+  box.innerHTML = head(`<p class="note">Chargement…</p>`);
+  const [p] = await Promise.all([loadParl(), API ? loadConf() : null]);
+  if (store.get("qf-canton") !== canton) return;  // le canton a changé entre-temps
+  const row = (e) => { const paid = e.liens.filter((l) => l.statut === "remunere").length, st = p?.elus[e.id], lp = liensPotentiels().find((x) => x.e === e);
+    return `<li class="elu-row"><button class="elu-card-head" data-open="elu" data-key="${e.id}">${e.photo ? `<img src="${esc(e.photo)}" alt="" width="44" height="44" loading="lazy" onerror="this.remove()">` : ""}<span><strong>${esc(e.nom)}</strong><br><small>${esc(e.parti)} · ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"}</small></span></button>
+      <p class="elu-facts">${e.liens.length} mandats, <b class="${paid ? "money" : ""}">${paid} rémunéré${paid > 1 ? "s" : ""}</b>${st?.participation != null ? ` · présence aux votes ${pctInt(st.participation)}` : ""}${st?.compare_parti ? ` · contre son parti ${pct(100 * st.contre_parti / st.compare_parti)}` : ""}${lp ? ` · <b class="money">${lp.n} lien${lp.n > 1 ? "s" : ""} d'intérêts potentiel${lp.n > 1 ? "s" : ""}</b>` : ""}</p>
+      ${API ? confBlock(e, true) : ""}</li>`; };
+  box.innerHTML = head(`${listMore(elus.map(row), 8, "élus")}
+    <div class="answers"><a class="btn ghost" href="#jouer:canton:${esc(canton)}">Mes élus en détail</a><a class="link" href="#absences">Qui manque le plus de votes ? →</a></div>${stamp("Lobbywatch, Services du Parlement, lecteurs du site")}`);
+}
+
+/* ---------------- Accueil : votations fédérales ---------------- */
+function renderVotHome() {
+  const box = $("#vot-home"); if (!box) return;
   const today = (M.genere || new Date().toISOString()).slice(0, 10);
   const up = V.filter((v) => v.statut === "À venir" && v.date >= today).sort((a, b) => a.date.localeCompare(b.date));
-  if (!up.length) { box.remove(); return; }
-  const date = up[0].date, vs = up.filter((v) => v.date === date), pour = sum(vs, (v) => v.argent?.pour), contre = sum(vs, (v) => v.argent?.contre);
-  const d = new Date(date + "T12:00:00"), j = (n) => dateFr(new Date(d - n * 864e5).toISOString().slice(0, 10));
-  box.outerHTML = `<a class="card une-card prochaine" href="#votations"><p class="eyebrow-s">Prochaine votation · ${esc(dateFr(date))}</p><h3>${vs.length} objet${vs.length > 1 ? "s" : ""}. Qui paie le oui et le non ?</h3>
-    <p class="note">${pour || contre ? `Déclaré au CDF jusqu'ici : <b class="infl">${short(pour)} CHF pour</b>, <b class="money">${short(contre)} CHF contre</b>.` : `Budgets des comités attendus au plus tard le ${j(45)}, publiés par le CDF avant le ${j(15)}.`}</p>
-    <span class="go">Les objets et l'argent →</span>${stamp("Swissvotes, CDF")}</a>`;
+  const past = V.filter((v) => v.oui != null).sort((a, b) => b.date.localeCompare(a.date));
+  const ag = argentGagne();
+  const lignes = (vs) => `<ul class="list">${vs.map((v) => `<li><span>${linkBtn("vote", v.id, v.titre)}${v.oui != null ? ` <span class="pill ${STATUT_CLS[v.statut] || ""}">${esc(v.statut)} · ${pct(v.oui)}</span>` : ""}</span><span class="sub">${v.argent ? `<b class="infl">${short(v.argent.pour)} CHF pour</b> · <b class="money">${short(v.argent.contre)} CHF contre</b>` : "budget des comités pas encore publié"}</span></li>`).join("")}</ul>`;
+  let next = "";
+  if (up.length) { const date = up[0].date, vs = up.filter((v) => v.date === date), declare = vs.some((v) => v.argent), d = new Date(date + "T12:00:00"), j = (n) => dateFr(new Date(d - n * 864e5).toISOString().slice(0, 10));
+    next = `<h3>Prochaine votation · ${esc(dateFr(date))}</h3>${lignes(vs)}<p class="note">${declare ? "Recettes déclarées au Contrôle fédéral des finances par les comités de campagne." : `Les comités déclarent leur budget au plus tard le ${j(45)} ; le CDF le publie avant le ${j(15)}. Le site le montrera dès sa publication.`}</p>`; }
+  let last = "";
+  if (past.length) { const date = past[0].date, vs = past.filter((v) => v.date === date); last = `<h3>Dernière votation · ${esc(dateFr(date))}</h3>${lignes(vs)}`; }
+  box.innerHTML = `<p class="eyebrow-s">Votations fédérales</p><h2 class="qs-q">Qui paie le oui et le non ?</h2>
+    <p class="note">Pour chaque objet, les recettes déclarées par les comités du oui et du non, donateurs compris. Obligatoire depuis 2023 pour les campagnes de plus de 50 000 CHF.</p>
+    <div class="vh-grid"><div>${next}</div><div>${last}</div></div>
+    <div class="answers"><a class="btn ghost" href="#tendances:argent-gagne">L'argent gagne ${ag.n} fois sur ${ag.rows.length} →</a><a class="link" href="#votations">Toutes les votations →</a></div>${stamp("Swissvotes, CDF")}`;
 }
 
 /* ---------------- Liens d'intérêts potentiels ---------------- */
@@ -1121,7 +1147,7 @@ async function renderSpotlight() {
   let picks = [];  // [[élu, articles], …] : trois élus au plus, décalés chaque jour
   if (byElu.size) {  // trois élus, décalés chaque jour, de partis différents quand c'est possible
     const c = [...byElu.entries()].sort((a, b) => b[1][0].date.localeCompare(a[1][0].date) || b[1].length - a[1].length), off = seed % c.length;
-    const ordre = c.map((_, i) => c[(off + i) % c.length]), partis = new Set();
+    const canton = store.get("qf-canton"), ordre = c.map((_, i) => c[(off + i) % c.length]).sort((a, b) => (b[0].canton === canton) - (a[0].canton === canton)), partis = new Set();
     for (const x of ordre) if (picks.length < 3 && !partis.has(x[0].parti)) { picks.push(x); partis.add(x[0].parti); }
     for (const x of ordre) if (picks.length < 3 && !picks.includes(x)) picks.push(x);
   }
@@ -1163,17 +1189,6 @@ async function voteConf(btn) {
 function confRated() {
   return L.elus.map((e) => ({ e, t: confOf(e.id) })).map((x) => ({ ...x, n: x.t.oui + x.t.non, pct: confPct(x.t) })).filter((x) => x.n >= MIN_CONF);
 }
-async function renderConfiance() {
-  const box = $("#conf"); if (!box) return; if (!API) { box.remove(); return; }
-  await loadConf();
-  const canton = store.get("qf-canton") || "", cantons = uniq(L.elus.map((e) => e.canton)).sort();
-  const rated = confRated(), top = [...rated].sort((a, b) => b.pct - a.pct || b.n - a.n).slice(0, 3), flop = [...rated].sort((a, b) => a.pct - b.pct || b.n - a.n).slice(0, 3);
-  const total = sum([...CONF.tot.values()], (t) => t.oui + t.non), mine = Object.keys(CONF.mes).length;
-  box.innerHTML = `<p class="eyebrow-s">Cote de confiance</p><h3>Faites-vous confiance à vos élus ?</h3>
-    <p class="note">Un vote par personne et par élu, modifiable, résultat public sur chaque fiche.${total >= 20 ? ` ${nf.format(total)} votes jusqu'ici.` : ""}${mine ? ` Vous avez noté ${mine} élu${mine > 1 ? "s" : ""}.` : ""}</p>
-    <div class="filters conf-filters"><select id="conf-canton" aria-label="Canton"><option value="">Votre canton…</option>${cantons.map((c) => `<option value="${c}"${c === canton ? " selected" : ""}>${c}</option>`).join("")}</select><a class="btn" href="#jouer:canton${canton ? ":" + canton : ""}">Noter mes élus</a></div>
-    ${rated.length ? `<div class="conf-grid"><p class="hint">Les mieux notés</p>${bars(top.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "i", (v) => `${v} %`, 100)}<p class="hint">Les moins bien notés</p>${bars(flop.map((x) => ({ label: `${x.e.nom} (${x.e.parti})`, value: x.pct, open: ["elu", x.e.id] })), "m", (v) => `${v} %`, 100)}</div><a class="go" href="#tendances:confiance">Le classement par parti →</a>` : ""}${stamp(SRC.confiance)}`;
-}
 function clConfiance() {
   const rated = confRated();
   if (!rated.length) return `<h3><a class="anchor" href="#tendances:confiance">${esc(CL.confiance)}</a></h3><p class="hint">« Faites-vous confiance à cet élu ? » : un vote par personne et par élu. Aucun élu n'a encore ${MIN_CONF} votes. <a href="#chercher">Votez pour les élus de votre canton</a>.</p>`;
@@ -1209,7 +1224,8 @@ async function renderUne() {
   const box = $("#une"); if (!box) return;
   const ag = argentGagne(), lp = liensPotentiels();
   const tile = (id, kicker, big, q, src) => `<a class="card une-card" href="#${id}"><p class="eyebrow-s">${esc(kicker)}</p><p class="big money">${esc(big)}</p><h3>${esc(q)}</h3><span class="go">Voir →</span>${stamp(src)}</a>`;
-  const html = (abs) => (abs ? tile("absences", "Absences", abs, "Qui manque le plus de votes ?", "Services du Parlement") : "")
+  const html = (abs) => tile("jouer:match", "Jouer", "10 votes", "Vous votez comme quel élu ?", "Services du Parlement")
+    + (abs ? tile("absences", "Absences", abs, "Qui manque le plus de votes ?", "Services du Parlement") : "")
     + (lp.length ? tile("tendances:liens", "Liens d'intérêts", `${lp.length} élus`, "Commission et mandat rémunéré du même secteur", "Lobbywatch") : "")
     + (ag.rows.length ? tile("tendances:argent-gagne", "Votations", `${ag.n} sur ${ag.rows.length}`, "L'argent gagne-t-il ?", "CDF, Swissvotes") : "");
   box.innerHTML = html("");
@@ -1707,7 +1723,7 @@ document.addEventListener("submit", (ev) => {
 });
 document.addEventListener("input", (ev) => {
   if (ev.target.id === "sc-groupe") { focusScrutin(ev.target.value); return; }
-  if (ev.target.id === "conf-canton") { store.set("qf-canton", ev.target.value); const a = $(".conf-filters a.btn"); if (a) a.href = `#jouer:canton${ev.target.value ? ":" + ev.target.value : ""}`; return; }
+  if (ev.target.id === "home-canton") { store.set("qf-canton", ev.target.value); renderMesElus(); renderSpotlight(); return; }
   if (ev.target.id === "fv-niveau") { const c = ev.target.value === "cantonal"; $("#f-votes").hidden = c; $("#f-cant").hidden = !c; renderVotes(); return; }
   if (ev.target.id !== "p-ref-q") return;
   $("#p-ref-res").innerHTML = searchRefs(ev.target.value).map((r) => `<button type="button" class="ref-hit" data-addref="${esc(r.type)}:${esc(r.key)}"><small>${esc(REF_LABEL[r.type])}</small> ${esc(r.label)}</button>`).join("");
@@ -1715,7 +1731,7 @@ document.addEventListener("input", (ev) => {
 
 (async function init() {
   [M, A, L, C, T, V] = await Promise.all([getJSON("meta", {}), getJSON("argent", { dons: [], campagnes: [] }), getJSON("lobby", { elus: [], liens: [], badges: [] }), getJSON("changes", []), getJSON("timeline", []), getJSON("votations", [])]);
-  buildIndexes(); status(); suggestions(); renderQuestion(); renderProchaine(); renderSpotlight(); renderConfiance(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
+  buildIndexes(); status(); suggestions(); renderQuestion(); renderVotHome(); renderMesElus(); renderSpotlight(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
   if (!C.length) document.querySelectorAll('a[href="#nouveautes"]').forEach((a) => (a.hidden = true));  // rien à montrer avant la 2e mise à jour
   else { const w = C[0], n = (w.dons_nouveaux || []).length, m = (w.mandats_nouveaux || []).length; const nl = $("#news-line"); nl.hidden = false; nl.innerHTML = `Cette semaine : ${n} nouveau${n > 1 ? "x" : ""} don${n > 1 ? "s" : ""}, ${m} nouveau${m > 1 ? "x" : ""} mandat${m > 1 ? "s" : ""}. <a href="#nouveautes">Voir les nouveautés →</a>`; }
   $("#fdb-tri").addEventListener("input", renderDebats);
