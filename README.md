@@ -12,13 +12,16 @@ Un site qui réunit, cherche et compare deux registres publics, mis à jour auto
 
 ## Ce que fait le site
 
+Cinq entrées : **Chercher** (accueil), **Classements** (avec Absences et Lobbyistes), **Jouer**, **Explorer** (Dons, Votations, Parlement, Réseaux, Nouveautés) et **Débats**.
+
+- **Accueil** : la question de la semaine (un chiffre du site, une question de fond, un sondage oui/non ; le site donne les chiffres, les lecteurs tranchent, puis défendent leur position dans les Débats), la prochaine votation et l'argent déclaré par chaque camp, le jeu « Vous votez comme quel élu ? », puis la recherche.
 - **Chercher** : une seule barre pour les donateurs, bénéficiaires, élus, organisations et titulaires de badges. Chaque résultat ouvre une fiche, avec les liens croisés (une entreprise qui donne de l'argent ET qui a des élus dans ses conseils).
 - **Dons** : tableau filtrable par type (élection, votation, parti), parti, secteur, année, camp (pour ou contre), montant. Export CSV.
 - **Votations** : chaque objet fédéral depuis 2023, avec son résultat, la carte des cantons, les mots d'ordre, et l'argent du oui et du non (donateurs compris) quand les comités l'ont déclaré au CDF.
 - **Parlement** : composition du Conseil national et du Conseil des États (hémicycles cliquables) ; votes nominaux du Conseil national (qui a voté quoi, par groupe) ; « les élus liés à un groupe d'intérêts votent-ils comme leur parti ? » ; puis vue par élu ou par mandat, filtres par parti, conseil, secteur, rémunération. Export CSV.
 - **Tendances** : plus gros donateurs, argent par secteur, argent reçu par parti, budget du oui contre budget du non pour chaque votation, secteurs les plus présents au Parlement, mandats rémunérés par parti, évolution semaine après semaine.
 - **Jouer** : « Vote comme un élu » (10 vrais votes du Conseil national, puis les élus et partis les plus proches), quiz de la semaine (renouvelé à chaque mise à jour), « Plus ou moins ? », « Mes élus » par canton. Chaque résultat se partage en image 1080 × 1350 (réseaux sociaux).
-- **Classements** : l'argent gagne-t-il les votations, combien coûte une voix, donateurs de plusieurs partis, cumul de mandats rémunérés, nouveaux mandats depuis l'élection, qui fait entrer quels lobbyistes, frondeurs et absents au Conseil national.
+- **Classements** : quel parti reçoit le plus (par siège), l'argent gagne-t-il les votations, combien coûte une voix, donateurs de plusieurs partis, cumul de mandats rémunérés, nouveaux mandats depuis l'élection, qui fait entrer quels lobbyistes, frondeurs et absents au Conseil national. Chaque classement commence par la comparaison **par parti** (moyenne par élu), puis par élu, et a sa propre adresse (`#tendances:cumul`), reprise dans le texte partagé avec l'image.
 - **Nouveautés** : ce qui a changé depuis la dernière mise à jour (nouveaux dons, nouveaux mandats, mandats terminés).
 
 ## Mise en ligne (5 minutes, gratuit)
@@ -35,6 +38,7 @@ Onglet « Débats » : chacun propose une hypothèse qui cite au moins une fiche
 
 - API : Cloudflare Worker + D1 dans `worker/` (JavaScript sans dépendance). Anti-robot : Cloudflare Turnstile.
 - Aucune donnée personnelle en clair : pas de compte ni d'email, l'adresse IP n'est conservée que sous forme d'empreinte salée (limite de 5 contributions par jour, votes plafonnés par connexion).
+- Le sondage de la question de la semaine passe par la même API (`/sondages/<id>`), un vote par appareil, modifiable. Les questions sont calculées dans `site/app.js` (`questions()`) et tournent chaque semaine ; une votation de moins de 14 jours passe devant. Pour forcer une question : `window.QF.QUESTION = "plafonner-dons"` dans `site/config.js`.
 - Configuration publique (adresse de l'API, sitekey Turnstile) : `site/config.js`. L'onglet reste masqué tant qu'elle est vide.
 - Secrets du Worker (`npx wrangler secret put`) : `TURNSTILE_SECRET`, `ADMIN_TOKEN`, `HASH_SALT`.
 - En local : `npx wrangler d1 execute qui-finance-debats --local --file worker/schema.sql`, puis `npx wrangler dev --config worker/wrangler.toml` et `cd site && python3 -m http.server 8000` (clés de test Turnstile dans `worker/.dev.vars`, non versionné).

@@ -37,8 +37,13 @@ Fichiers de données : `argent.json` (dons, campagnes), `lobby.json` (élus, lie
 - **Ligne éditoriale** : clivant mais factuel, même règle pour tous les partis, chiffres sourcés, titres en questions, jamais d'insinuation ni d'appel à la démission. Un lien n'est pas une faute.
 
 ## Fonctionnalités en ligne (onglets)
-Chercher (avec « À la une ») · Jouer (Vote comme un élu, quiz de la semaine, Plus ou moins, Mes élus) · Absences · Lobbyistes (353 badges, 205 lobbyistes) · Réseaux (carte à bulles façon Obsidian/Bubblemaps) · Dons · Votations (fédéral / cantonal) · Parlement (hémicycles, votes au Conseil national, intérêts × votes) · Classements (argent gagne-t-il, coût par voix, multi-partis, cumul, nouveaux mandats, frondeurs, absents) · Débats · Nouveautés.
-Images à partager 1080 × 1350 générées dans le navigateur (`shareCard`, `shareNet`).
+Navigation à **5 entrées** (revue du 28.09.2026) : Chercher · Classements (sous-nav : tous, Absences, Lobbyistes) · Jouer · Explorer (sous-nav : Dons, Votations, Parlement, Réseaux, Nouveautés) · Débats. Les sections HTML et les ancres (`#absences`, `#dons`…) n'ont pas changé ; `data-group` sur le lien de nav et `.subnav` dans chaque section. Nouveautés est masqué tant que `changes.json` est vide.
+- **Accueil** : la question de la semaine (`questions()` dans app.js : un chiffre du site + une question de fond + sondage oui/non via l'API `/sondages/<id>`, un vote par appareil ; rotation hebdomadaire sur `M.genere`, une votation de moins de 14 jours passe devant ; `window.QF.QUESTION` force une question) ; prochaine votation avec l'argent de chaque camp ou le calendrier légal (budgets 45 jours avant, publication CDF 15 jours avant) ; carte « Vous votez comme quel élu ? » ; recherche ; À la une.
+- **Classements** : quel parti reçoit le plus (par siège), argent gagne-t-il, coût par voix, multi-partis, cumul, nouveaux mandats, badges, frondeurs, absents. Chaque carte a un id `cl-<clé>` (`CL` dans app.js), une ancre `#tendances:<clé>` (reprise dans le texte partagé) et commence par le bloc **par parti** (`parParti`, moyenne par élu, partis d'au moins 3 élus, couleur du groupe).
+- Jouer (Vote comme un élu, quiz de la semaine, Plus ou moins, Mes élus) · Absences · Lobbyistes · Réseaux · Dons · Votations · Parlement · Nouveautés : inchangés.
+- **Débats** : une hypothèse peut citer un classement (type de référence `classement`, clé = clé `CL`) ; le bouton « Défendre ma position » du sondage ouvre le formulaire avec ce classement cité. `hypotheses` = 9 en attente le 28.09 (8 de la rédaction, une par classement, + 1 test « Le Zouave ») : à publier dans admin.html.
+Images à partager 1080 × 1350 générées dans le navigateur (`shareCard`, `shareNet`) ; `link` = adresse profonde ajoutée au texte partagé.
+Ligne éditoriale de la revue : le site pose la question et donne les chiffres, l'utilisateur tranche ; par parti avant par élu (clivant sans viser une personne).
 
 ## Débats (forum d'hypothèses)
 - Pseudo sans compte, **tout modéré avant publication** sur `site/admin.html` (mot de passe dans le gestionnaire du propriétaire).
@@ -56,6 +61,7 @@ cd site && python3 -m http.server 8000         # voir le site en local
 - Worker : depuis `worker/`, `npx wrangler deploy` ; en local `npx wrangler dev` (clés de test Turnstile dans `worker/.dev.vars`, non versionné).
 
 ## À faire / pistes
+- Idées de Doïc (28.09) : **spotlight** d'un élu sur l'accueil, aléatoire ou tiré d'articles récents (flux RSS RTS / Le Temps / SRF croisés avec les noms des élus, dans `build.py`, fichier `presse.json`) ; page **« S'engager »** : liens vers l'adhésion et les dons de chaque parti représenté aux Chambres, même format pour tous, ordre par sièges ou alphabétique, clics comptés par l'API sans donnée personnelle (pas de programme d'affiliation chez les partis : « tracker » = UTM + compteur).
 - Genève : absences **excusées** des députés (listes « Ont fait excuser leur absence » du Mémorial, depuis 2023). Vaud : vote secret par défaut (motion refusée 64-59), à montrer comme information.
 - Réseaux : option pour masquer les intergroupes parlementaires (Sport, Abeilles…) qui dominent les carrefours.
 - Actions GitHub encore sur Node 20 (dépréciation) : passer aux versions récentes.
