@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qui finance la politique suisse ?</title>
+<meta name="description" content="Dons aux partis et aux campagnes (CDF) et liens d'intérêts des parlementaires (Lobbywatch), réunis et mis à jour chaque semaine.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔎</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <a class="brand" href="#chercher">Qui finance ?</a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#chercher" data-tab="chercher">Chercher</a>
+      <a href="#dons" data-tab="dons">Dons</a>
+      <a href="#parlement" data-tab="parlement">Parlement</a>
+      <a href="#tendances" data-tab="tendances">Tendances</a>
+      <a href="#nouveautes" data-tab="nouveautes">Nouveautés</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="tab-chercher" class="tab">
+    <h1 class="hero">Qui finance qui<br>dans la politique suisse ?</h1>
+    <p class="lede">Tapez un nom de donateur, de parti, d'élu, d'entreprise ou de lobby. Les dons déclarés au Contrôle fédéral des finances et les liens d'intérêts des parlementaires sont cherchés ensemble.</p>
+    <label class="search-big">
+      <span class="sr">Recherche</span>
+      <input id="q" type="search" placeholder="UBS, Blocher, assurance, Wehrli…" autocomplete="off" autofocus>
+    </label>
+    <div class="chips" id="suggest"></div>
+    <div id="results"></div>
+  </section>
+
+  <section id="tab-dons" class="tab" hidden>
+    <h2>Dons déclarés</h2>
+    <p class="note">Dons de plus de 15 000 CHF aux partis et de toute taille aux campagnes de plus de 50 000 CHF. Pour chaque campagne, seul le décompte final est retenu (ou le budget s'il n'est pas encore publié), pour ne pas compter deux fois les mêmes francs.</p>
+    <div class="filters" id="f-dons"></div>
+    <p class="summary" id="s-dons"></p>
+    <div class="table-wrap"><table id="t-dons"></table></div>
+    <div class="pager" id="p-dons"></div>
+  </section>
+
+  <section id="tab-parlement" class="tab" hidden>
+    <h2>Liens d'intérêts des parlementaires</h2>
+    <p class="note">Mandats en cours déclarés par les 246 élus fédéraux, classés par Lobbywatch en groupes et secteurs. La rémunération n'est connue que si l'élu l'a communiquée.</p>
+    <div class="filters" id="f-parl"></div>
+    <p class="summary" id="s-parl"></p>
+    <div class="table-wrap"><table id="t-parl"></table></div>
+    <div class="pager" id="p-parl"></div>
+  </section>
+
+  <section id="tab-tendances" class="tab" hidden>
+    <h2>Tendances</h2>
+    <div class="filters" id="f-trend"></div>
+    <div class="grid" id="charts"></div>
+  </section>
+
+  <section id="tab-nouveautes" class="tab" hidden>
+    <h2>Nouveautés</h2>
+    <p class="note">Ce qui a changé à chaque mise à jour hebdomadaire : nouveaux dons publiés, nouveaux mandats, mandats terminés.</p>
+    <div id="news"></div>
+  </section>
+</main>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-back" data-close></div>
+  <article class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <button class="close" data-close aria-label="Fermer">×</button>
+    <div id="sheet-body"></div>
+  </article>
+</div>
+
+<footer class="foot wrap">
+  <p id="status"></p>
+  <p>Sources : <a href="https://politikfinanzierung.efk.admin.ch">Contrôle fédéral des finances (CDF), transparence du financement de la vie politique</a>, via <a href="https://github.com/lgnbhl/swiss-political-financing">swiss-political-financing</a> (« Open use »). <a href="https://lobbywatch.ch">Lobbywatch.ch</a> (CC BY-SA 4.0). Les rapprochements par secteur sont automatiques et peuvent contenir des erreurs. Un lien d'intérêt n'est pas une faute : c'est une information.</p>
+</footer>
+<script src="app.js" defer></script>
+</body>
+</html>

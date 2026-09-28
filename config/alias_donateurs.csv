@@ -1,0 +1,9 @@
+motif;nom_affiche
+^hev schweiz$;Hauseigentümerverband (HEV) Schweiz
+^hauseigentumerverband;Hauseigentümerverband (HEV) Schweiz
+^economiesuisse;economiesuisse
+^ubs\b;UBS
+^svp schweiz$|^schweizerische volkspartei svp schweiz$;UDC Suisse (SVP)
+^schweizerischer gewerbeverband|^usam\b|^sgv\b;Union suisse des arts et métiers (USAM)
+^schweizerischer arbeitgeberverband|^union patronale;Union patronale suisse
+^schweizerischer gewerkschaftsbund|^union syndicale suisse|^sgb\b;Union syndicale suisse (USS)
