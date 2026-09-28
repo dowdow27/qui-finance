@@ -216,6 +216,8 @@ tr.click:hover td { background: color-mix(in srgb, var(--infl-soft) 55%, transpa
 .fill.i2 { background: color-mix(in srgb, var(--infl) 35%, var(--paper)); }
 .fill.f-G { background: var(--f-G); } .fill.f-S { background: var(--f-S); } .fill.f-GL { background: var(--f-GL); } .fill.f-ME { background: var(--f-ME); } .fill.f-RL { background: var(--f-RL); } .fill.f-V { background: var(--f-V); } .fill.f-X { background: var(--f-X); }
 .cl-parti { margin: 0 0 14px; padding: 0 0 12px; border-bottom: 1px solid var(--rule); }
+.cl-sommaire { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 4px; }
+.cl-sommaire .chip { font-size: .88rem; }
 .stamp { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 8px; margin: 14px 0 0; }
 .card h3 a.anchor { color: inherit; text-decoration: none; }
 .card h3 a.anchor:hover { text-decoration: underline; }

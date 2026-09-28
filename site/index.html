@@ -19,7 +19,7 @@
       <a href="#chercher" data-tab="chercher">Chercher</a>
       <a href="#tendances" data-tab="tendances" data-group="tendances absences lobbyistes">Classements</a>
       <a href="#jouer" data-tab="jouer">Jouer</a>
-      <a href="#dons" data-tab="dons" data-group="dons votations parlement reseaux nouveautes">Données</a>
+      <a href="#dons" data-tab="dons" data-group="dons votations parlement reseaux trends nouveautes">Données</a>
       <a href="#engager" data-tab="engager" class="sec">S'engager</a>
       <a href="#debats" data-tab="debats" class="sec">Débats</a>
     </nav>
@@ -50,7 +50,7 @@
   </section>
 
   <section id="tab-dons" class="tab" hidden>
-    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#trends">Tendances</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Dons déclarés</h2>
     <p class="note">Dons de plus de 15 000 CHF aux partis et de toute taille aux campagnes de plus de 50 000 CHF. Pour chaque campagne, seul le décompte final est retenu (ou le budget s'il n'est pas encore publié), pour ne pas compter deux fois les mêmes francs.</p>
     <div class="filters" id="f-dons"></div>
@@ -60,7 +60,7 @@
   </section>
 
   <section id="tab-votations" class="tab" hidden>
-    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#trends">Tendances</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Votations</h2>
     <p class="note">Tous les objets soumis au peuple depuis 2023. Fédéral : résultat par canton, mots d'ordre, vote final du Conseil national et argent déclaré par les comités de chaque camp (obligatoire depuis le 23 octobre 2023, pour les campagnes de plus de 50 000 CHF). Cantonal : résultat par commune.</p>
     <div class="filters level"><select id="fv-niveau" aria-label="Niveau"><option value="federal">Votations fédérales</option><option value="cantonal">Votations cantonales</option></select></div>
@@ -71,7 +71,7 @@
   </section>
 
   <section id="tab-parlement" class="tab" hidden>
-    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#trends">Tendances</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Composition du Parlement</h2>
     <p class="note">Sièges par groupe parlementaire. Les petits partis siègent dans le groupe d'un grand parti (par exemple le MCG et la Lega avec l'UDC). Cliquez un siège pour ouvrir la fiche de l'élu.</p>
     <div class="grid" id="hemis"></div>
@@ -112,7 +112,7 @@
   </section>
 
   <section id="tab-reseaux" class="tab" hidden>
-    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#trends">Tendances</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Qui est lié à qui ?</h2>
     <p class="note">La carte des liens entre élus et organisations : chaque trait est un mandat déclaré (Lobbywatch), en rouge s'il est rémunéré ; en pointillé, un élu qui donne son badge d'accès au Palais fédéral à un lobbyiste de l'organisation. Les bulles liées se regroupent : les « clans » apparaissent d'eux-mêmes.</p>
     <div class="filters" id="f-net"></div>
@@ -124,7 +124,12 @@
     <h2>Classements</h2>
     <p class="note">Les chiffres qui font parler, calculés à partir des registres. Chaque ligne renvoie à sa fiche, avec les précautions de lecture.</p>
     <div class="grid" id="classements"></div>
+  </section>
+
+  <section id="tab-trends" class="tab" hidden>
+    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#trends">Tendances</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Tendances</h2>
+    <p class="note">Plus gros donateurs, argent par secteur et par parti, budget du oui contre budget du non, secteurs présents au Parlement, évolution semaine après semaine.</p>
     <div class="filters" id="f-trend"></div>
     <div class="grid" id="charts"></div>
   </section>
@@ -171,7 +176,7 @@
   </section>
 
   <section id="tab-nouveautes" class="tab" hidden>
-    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
+    <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#trends">Tendances</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>
     <h2>Nouveautés</h2>
     <p class="note">Ce qui a changé à chaque mise à jour hebdomadaire : nouveaux dons publiés, nouveaux mandats, mandats terminés.</p>
     <div id="news"></div>
