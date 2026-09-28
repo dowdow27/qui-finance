@@ -208,7 +208,7 @@ def build_lobbywatch() -> dict:
             "profession": p.get("beruf_fr") or p.get("beruf") or "",
             "fraction": p.get("fraktion") or "",
             "photo": PHOTO_URL.format(p["parlament_number"]) if p.get("parlament_number") else "",
-            "parlement": BIO_URL.format(p["parlament_number"]) if p.get("parlament_number") else "",
+            "parlement": BIO_URL.format(p["parlament_biografie_id"]) if p.get("parlament_biografie_id") else "",
             "url": f"https://lobbywatch.ch/fr/daten/parlamentarier/{pid}",
         })
         for ib in p.get("interessenbindungen") or []:
