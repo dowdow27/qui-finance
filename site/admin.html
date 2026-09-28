@@ -34,7 +34,7 @@ async function call(path, data) {
   if (!r.ok) throw new Error(out.erreur || `erreur ${r.status}`);
   return out;
 }
-const refs = (rs) => rs.map((r) => `<a class="chip ref" href="./#chercher:${encodeURIComponent(r.label)}" target="_blank"><small>${esc(r.type)}</small> ${esc(r.label)}</a>`).join(" ");
+const refs = (rs) => rs.map((r) => `<a class="chip ref" href="./#${r.type === "classement" ? "tendances:" + encodeURIComponent(r.key) : "chercher:" + encodeURIComponent(r.label)}" target="_blank"><small>${esc(r.type)}</small> ${esc(r.label)}</a>`).join(" ");
 const actions = (t, id, pub) => pub
   ? `<button class="btn ghost" data-act="supprimer" data-t="${t}" data-id="${id}">Supprimer</button>`
   : `<button class="btn" data-act="publier" data-t="${t}" data-id="${id}">Publier</button> <button class="btn ghost" data-act="refuser" data-t="${t}" data-id="${id}">Refuser</button>`;
@@ -48,6 +48,7 @@ async function load() {
     $("#msg").textContent = `${f.hypotheses.length} hypothèse(s) et ${f.commentaires.length} commentaire(s) en attente.`;
     $("#out").innerHTML = `<h3>Hypothèses en attente</h3>${f.hypotheses.map((h) => `<div class="hypo"><div></div><div class="hypo-body"><h3>${esc(h.titre)}</h3><p class="meta">${esc(h.pseudo)}, ${esc(h.cree_le)} UTC</p><p class="texte">${esc(h.texte)}</p><div class="chips">${refs(h.refs)}</div>${actions("hypotheses", h.id)}</div></div>`).join("") || "<p class='note'>Rien.</p>"}
       <h3>Commentaires en attente</h3>${f.commentaires.map((c) => `<div class="hypo"><div></div><div class="hypo-body"><p class="meta">${esc(c.pseudo)}, ${esc(c.cree_le)} UTC, sur « ${esc(c.hypothese)} »</p><p class="texte">${esc(c.texte)}</p>${actions("commentaires", c.id)}</div></div>`).join("") || "<p class='note'>Rien.</p>"}
+      <h3>Sondages (question de la semaine)</h3>${(f.sondages || []).map((x) => `<p class="summary">${esc(x.question)} : ${x.oui} oui, ${x.non} non</p>`).join("") || "<p class='note'>Aucun vote.</p>"}
       <h3>Publiées (100 dernières)</h3>${f.publiees.map((h) => `<div class="hypo"><div class="votebox"><b class="score">${h.score}</b></div><div class="hypo-body"><h3>${esc(h.titre)}</h3><p class="meta">${esc(h.pseudo)}, ${esc(h.publie_le)} UTC · ${h.pour} pour, ${h.contre} contre, ${h.n_com} commentaire(s)</p><div class="chips">${refs(h.refs)}</div>${actions("hypotheses", h.id, true)}</div></div>`).join("") || "<p class='note'>Rien.</p>"}`;
   } catch (e) { $("#msg").textContent = `Impossible de charger : ${e.message}.`; $("#out").innerHTML = ""; }
 }

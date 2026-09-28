@@ -37,3 +37,14 @@ CREATE TABLE IF NOT EXISTS votes (
   PRIMARY KEY (hypothese_id, votant_hash)
 );
 CREATE INDEX IF NOT EXISTS vote_ip ON votes (hypothese_id, ip_hash);
+
+-- Sondages : la question de la semaine (site/app.js, questions()). Un vote par appareil, plafonné par connexion.
+CREATE TABLE IF NOT EXISTS sondages (
+  question TEXT NOT NULL,             -- identifiant de la question, ex. « plafonner-dons »
+  votant_hash TEXT NOT NULL,          -- sha256(sel + identifiant d'appareil)
+  ip_hash TEXT NOT NULL,
+  valeur INTEGER NOT NULL CHECK (valeur IN (-1, 1)),
+  cree_le TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (question, votant_hash)
+);
+CREATE INDEX IF NOT EXISTS sond_ip ON sondages (question, ip_hash);

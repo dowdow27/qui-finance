@@ -2,7 +2,7 @@
    Tout ce qui est proposé attend une validation avant publication (page site/admin.html). */
 
 const ORIGINS = ["https://dowdow27.github.io", "http://localhost:8000"];
-const REF_TYPES = new Set(["donor", "recip", "elu", "org", "vote", "scrutin", "cantonal"]);
+const REF_TYPES = new Set(["donor", "recip", "elu", "org", "vote", "scrutin", "cantonal", "classement"]);
 const MAX = { pseudo: 40, titre: 140, texte: 2000, commentaire: 1000, refs: 6, postsParJour: 5, votantsParIp: 5 };
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -42,6 +42,8 @@ async function route(req, env) {
   if ((r = p.match(/^\/hypotheses\/(\d+)$/)) && m === "GET") return getHypothese(env, +r[1]);
   if ((r = p.match(/^\/hypotheses\/(\d+)\/commentaires$/)) && m === "POST") return createCommentaire(req, env, +r[1]);
   if ((r = p.match(/^\/hypotheses\/(\d+)\/vote$/)) && m === "POST") return vote(req, env, +r[1]);
+  if ((r = p.match(/^\/sondages\/([a-z0-9-]{3,40})$/)) && m === "GET") return getSondage(env, r[1], url);
+  if ((r = p.match(/^\/sondages\/([a-z0-9-]{3,40})\/vote$/)) && m === "POST") return voteSondage(req, env, r[1]);
   if (p.startsWith("/admin/")) {
     checkAdmin(req, env);
     if (p === "/admin/file" && m === "GET") return adminFile(env);
@@ -182,6 +184,33 @@ async function vote(req, env, id) {
   return json({ score: s.score, pour: s.pour, contre: s.contre, mon_vote: valeur || null });
 }
 
+/* ---------------- Sondages (question de la semaine) ---------------- */
+
+const votantHash = (env, device) => sha(`${env.HASH_SALT}|device|${device}`);
+async function sondageTotaux(env, q, votant) {
+  const t = await env.DB.prepare("SELECT SUM(valeur = 1) AS oui, SUM(valeur = -1) AS non FROM sondages WHERE question = ?").bind(q).first();
+  const mine = votant ? await env.DB.prepare("SELECT valeur FROM sondages WHERE question = ? AND votant_hash = ?").bind(q, votant).first() : null;
+  return { oui: t?.oui || 0, non: t?.non || 0, mon_vote: mine?.valeur ?? null };
+}
+async function getSondage(env, q, url) {
+  const device = url.searchParams.get("d") || "";
+  const votant = /^[\w-]{16,64}$/.test(device) ? await votantHash(env, device) : "";
+  return json(await sondageTotaux(env, q, votant));
+}
+async function voteSondage(req, env, q) {
+  const b = await body(req);
+  const valeur = Number(b.valeur);
+  if (![-1, 1].includes(valeur)) throw fail(400, "Vote invalide");
+  if (!/^[\w-]{16,64}$/.test(String(b.device || ""))) throw fail(400, "Appareil invalide");
+  await human(req, env, b.turnstile);
+  const votant = await votantHash(env, b.device), iph = await ipHash(req, env);
+  const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM sondages WHERE question = ?1 AND ip_hash = ?2 AND votant_hash <> ?3").bind(q, iph, votant).first();
+  if (n >= MAX.votantsParIp) throw fail(429, "Trop de votes depuis cette connexion");
+  await env.DB.prepare(`INSERT INTO sondages (question, votant_hash, ip_hash, valeur) VALUES (?, ?, ?, ?)
+    ON CONFLICT (question, votant_hash) DO UPDATE SET valeur = excluded.valeur, ip_hash = excluded.ip_hash`).bind(q, votant, iph, valeur).run();
+  return json(await sondageTotaux(env, q, votant));
+}
+
 /* ---------------- Modération ---------------- */
 
 function checkAdmin(req, env) {
@@ -190,13 +219,14 @@ function checkAdmin(req, env) {
 }
 
 async function adminFile(env) {
-  const [h, c, pub] = await env.DB.batch([
+  const [h, c, pub, sond] = await env.DB.batch([
     env.DB.prepare("SELECT id, pseudo, titre, texte, refs, cree_le FROM hypotheses WHERE statut = 'attente' ORDER BY cree_le"),
     env.DB.prepare(`SELECT c.id, c.pseudo, c.texte, c.cree_le, c.hypothese_id, h.titre AS hypothese
       FROM commentaires c JOIN hypotheses h ON h.id = c.hypothese_id WHERE c.statut = 'attente' ORDER BY c.cree_le`),
     env.DB.prepare(`SELECT h.id, h.pseudo, h.titre, h.refs, h.publie_le, ${SCORE} FROM hypotheses h WHERE h.statut = 'publie' ORDER BY h.publie_le DESC LIMIT 100`),
+    env.DB.prepare("SELECT question, SUM(valeur = 1) AS oui, SUM(valeur = -1) AS non FROM sondages GROUP BY question ORDER BY oui + non DESC"),
   ]);
-  return json({ hypotheses: parseRefs(h.results), commentaires: c.results, publiees: parseRefs(pub.results) });
+  return json({ hypotheses: parseRefs(h.results), commentaires: c.results, publiees: parseRefs(pub.results), sondages: sond.results });
 }
 
 async function adminAction(req, env, table, id) {
