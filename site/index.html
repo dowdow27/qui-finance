@@ -18,6 +18,7 @@
     <nav class="tabs" aria-label="Sections">
       <a href="#chercher" data-tab="chercher">Chercher</a>
       <a href="#dons" data-tab="dons">Dons</a>
+      <a href="#votations" data-tab="votations">Votations</a>
       <a href="#parlement" data-tab="parlement">Parlement</a>
       <a href="#tendances" data-tab="tendances">Tendances</a>
       <a href="#nouveautes" data-tab="nouveautes">Nouveautés</a>
@@ -46,9 +47,20 @@
     <div class="pager" id="p-dons"></div>
   </section>
 
+  <section id="tab-votations" class="tab" hidden>
+    <h2>Votations fédérales</h2>
+    <p class="note">Tous les objets soumis au peuple depuis 2023, avec le résultat par canton, les mots d'ordre et l'argent déclaré par les comités de chaque camp. L'obligation de déclarer les campagnes s'applique depuis le 23 octobre 2023, aux campagnes de plus de 50 000 CHF.</p>
+    <div class="filters" id="f-votes"></div>
+    <p class="summary" id="s-votes"></p>
+    <div id="l-votes"></div>
+  </section>
+
   <section id="tab-parlement" class="tab" hidden>
+    <h2>Composition du Parlement</h2>
+    <p class="note">Sièges par groupe parlementaire. Les petits partis siègent dans le groupe d'un grand parti (par exemple le MCG et la Lega avec l'UDC). Cliquez un siège pour ouvrir la fiche de l'élu.</p>
+    <div class="grid" id="hemis"></div>
     <h2>Liens d'intérêts des parlementaires</h2>
-    <p class="note">Mandats en cours déclarés par les 246 élus fédéraux, classés par Lobbywatch en groupes et secteurs. La rémunération n'est connue que si l'élu l'a communiquée.</p>
+    <p class="note">Mandats en cours déclarés par les <span id="n-elus"></span> élus fédéraux, classés par Lobbywatch en groupes et secteurs. La rémunération n'est connue que si l'élu l'a communiquée.</p>
     <div class="filters" id="f-parl"></div>
     <p class="summary" id="s-parl"></p>
     <div class="table-wrap"><table id="t-parl"></table></div>
@@ -78,7 +90,7 @@
 
 <footer class="foot wrap">
   <p id="status"></p>
-  <p>Sources : <a href="https://politikfinanzierung.efk.admin.ch">Contrôle fédéral des finances (CDF), transparence du financement de la vie politique</a>, via <a href="https://github.com/lgnbhl/swiss-political-financing">swiss-political-financing</a> (« Open use »). <a href="https://lobbywatch.ch">Lobbywatch.ch</a> (CC BY-SA 4.0). Les rapprochements par secteur sont automatiques et peuvent contenir des erreurs. Un lien d'intérêt n'est pas une faute : c'est une information.</p>
+  <p>Sources : <a href="https://politikfinanzierung.efk.admin.ch">Contrôle fédéral des finances (CDF), transparence du financement de la vie politique</a>, via <a href="https://github.com/lgnbhl/swiss-political-financing">swiss-political-financing</a> (« Open use »). <a href="https://lobbywatch.ch">Lobbywatch.ch</a> (CC BY-SA 4.0). Votations : <a href="https://swissvotes.ch">Swissvotes, Année politique suisse, Université de Berne</a> (CC BY 4.0) et <a href="https://www.bfs.admin.ch">Office fédéral de la statistique</a> (« Open use »). Photos des élus : © ParlCH. Les rapprochements par secteur sont automatiques et peuvent contenir des erreurs. Un lien d'intérêt n'est pas une faute : c'est une information.</p>
 </footer>
 <script src="app.js" defer></script>
 </body>

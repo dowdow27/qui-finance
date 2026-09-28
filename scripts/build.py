@@ -5,6 +5,7 @@ Sources (téléchargées à chaque exécution) :
   - CDF / EFK, transparence du financement de la vie politique, via le miroir CSV
     hebdomadaire github.com/lgnbhl/swiss-political-financing (données officielles, « Open use »)
   - Lobbywatch.ch, export hebdomadaire agrégé (CC BY-SA 4.0)
+  - swissvotes.ch, votations fédérales (CC BY 4.0), complété par les résultats cantonaux de l'OFS
 
 Python 3.10+ standard uniquement, aucune dépendance.
 Si une source échoue, les données précédentes sont conservées et signalées sur le site.
@@ -33,6 +34,9 @@ EFK_BASE = "https://raw.githubusercontent.com/lgnbhl/swiss-political-financing/m
 LW_URL = ("https://cms.lobbywatch.ch/sites/lobbywatch.ch/files/exports/"
           "lobbywatch_export_aggregated.json.zip")
 LW_INNER = "parlamentarier_nested"
+PHOTO_URL = "https://www.parlament.ch/SiteCollectionImages/profil/portrait-260/{}.jpg"  # © ParlCH
+SV_URL = "https://swissvotes.ch/page/dataset/swissvotes_dataset.csv"  # CC BY 4.0
+BFS_URL = "https://ogd-static.voteinfo-app.ch/v1/ogd/sd-t-17-02-{}-eidgAbstimmung.json"
 UA = {"User-Agent": "qui-finance-ch/1.0"}
 NOW = datetime.now(timezone.utc)
 MIN_ELUS = int(os.environ.get("MIN_ELUS", "100"))
@@ -201,6 +205,8 @@ def build_lobbywatch() -> dict:
             "conseil": p.get("rat_fr") or p.get("rat") or "",
             "commissions": p.get("kommissionen_abkuerzung") or "",
             "profession": p.get("beruf_fr") or p.get("beruf") or "",
+            "fraction": p.get("fraktion") or "",
+            "photo": PHOTO_URL.format(p["parlament_number"]) if p.get("parlament_number") else "",
             "url": f"https://lobbywatch.ch/fr/daten/parlamentarier/{pid}",
         })
         for ib in p.get("interessenbindungen") or []:
@@ -311,6 +317,130 @@ def build_efk(orgs: dict) -> dict:
 
 
 # --------------------------------------------------------------------------
+# Votations fédérales : swissvotes.ch, complété par l'OFS pour les résultats cantonaux
+# --------------------------------------------------------------------------
+
+VOTES_SINCE = 2023
+CANTONS = "ZH BE LU UR SZ OW NW GL ZG FR SO BS BL SH AR AI SG GR AG TG TI VD VS NE GE JU".split()
+VOTE_TYPES = {"1": "Référendum obligatoire", "2": "Référendum facultatif", "3": "Initiative populaire",
+              "4": "Contre-projet", "5": "Question subsidiaire"}
+# Codebook swissvotes : 1 oui, 2 non, 3 pas de mot d'ordre, 5 liberté de vote,
+# 8 / 9 préférence pour le contre-projet / l'initiative (questions subsidiaires)
+PAROLES = {"1": "oui", "2": "non", "3": "aucun", "5": "liberté", "8": "contre-projet", "9": "initiative"}
+SV_ACTORS = [("svp", "UDC"), ("sps", "PS"), ("mitte", "Le Centre"), ("fdp", "PLR"), ("glp", "Vert'libéraux"),
+             ("gps", "Verts"), ("evp", "PEV"), ("edu", "UDF"), ("eco", "economiesuisse"),
+             ("sgv", "Union des arts et métiers"), ("sbv", "Union des paysans"), ("sgb", "Union syndicale")]
+
+
+def fnum(v: str | None) -> float | None:
+    v = (v or "").replace("’", "").replace("'", "").strip()
+    try:
+        return float(v) if v not in ("", ".") else None
+    except ValueError:
+        return None
+
+
+def bfs_results(date: str) -> dict:
+    """Résultats OFS d'un dimanche de votation : {numéro swissvotes × 10: vorlage}."""
+    data = json.loads(http_get(BFS_URL.format(date.replace("-", "")), timeout=120))
+    return {v["vorlagenId"]: v for v in data["schweiz"]["vorlagen"]}
+
+
+def match_campaigns(votes: list[dict], campagnes: list[dict]) -> None:
+    """Rattache chaque objet CDF « JJ.MM.AAAA titre » à la votation du même jour au titre le plus proche."""
+    def words(s):
+        return {w for w in norm(s, strip_legal=False).split() if len(w) > 3}
+    evts = {c["evt"] for c in campagnes if c["cat"] == "Votation" and c.get("evt")}
+    pairs = []
+    for e in evts:
+        m = re.match(r"(\d\d)\.(\d\d)\.(\d{4})\s*(.*)", e)
+        if not m:
+            continue
+        day, title = f"{m[3]}-{m[2]}-{m[1]}", words(m[4])
+        for v in votes:
+            if v["date"] == day and title:
+                score = len(title & words(v["titre_off"] + " " + v["titre"])) / len(title)
+                pairs.append((score, e, v["id"]))
+    used_e, used_v, best = set(), set(), {}
+    for score, e, vid in sorted(pairs, reverse=True):
+        if score >= 0.5 and e not in used_e and vid not in used_v:
+            used_e.add(e), used_v.add(vid)
+            best[vid] = e
+    for v in votes:
+        e = best.get(v["id"])
+        camps = [c for c in campagnes if c["evt"] == e] if e else []
+        v["argent"] = {"evt": e, "pour": round(sum(c["total"] or 0 for c in camps if c["camp"] == "Pour")),
+                       "contre": round(sum(c["total"] or 0 for c in camps if c["camp"] == "Contre"))} if e else None
+
+
+def build_votes(campagnes: list[dict]) -> list[dict]:
+    raw = http_get(SV_URL)
+    rows = list(csv.DictReader(io.StringIO(raw.decode("utf-8-sig")), delimiter=";"))
+    if len(rows) < 600:
+        raise RuntimeError("export swissvotes incomplet")
+    today = NOW.date().isoformat()
+    bfs_cache: dict[str, dict] = {}
+    votes = []
+    for r in rows:
+        try:
+            day = datetime.strptime(r["datum"], "%d.%m.%Y").date().isoformat()
+        except ValueError:
+            continue
+        if int(day[:4]) < VOTES_SINCE:
+            continue
+        typ = r.get("rechtsform", "")
+        cantons = {}
+        for c in CANTONS:
+            k = c.lower()
+            acc = r.get(f"{k}-annahme")
+            cantons[c] = {"oui": fnum(r.get(f"{k}-japroz")), "participation": fnum(r.get(f"{k}-bet")),
+                          "accepte": True if acc == "1" else False if acc == "0" else None}
+        oui, part = fnum(r.get("volkja-proz")), fnum(r.get("bet"))
+        # swissvotes publie les détails cantonaux avec retard : on les prend alors à l'OFS
+        if day <= today and any(v["oui"] is None for v in cantons.values()):
+            try:
+                if day not in bfs_cache:
+                    bfs_cache[day] = bfs_results(day)
+                vl = bfs_cache[day].get(round(float(r["anr"]) * 10))
+            except Exception:  # noqa: BLE001  (résultats cantonaux facultatifs)
+                vl = None
+            if vl:
+                oui = oui if oui is not None else vl["resultat"].get("jaStimmenInProzent")
+                part = part if part is not None else vl["resultat"].get("stimmbeteiligungInProzent")
+                for k in vl.get("kantone") or []:
+                    c = CANTONS[int(k["geoLevelnummer"]) - 1]
+                    res = k.get("resultat") or {}
+                    y = res.get("jaStimmenInProzent")
+                    cantons[c]["oui"] = round(y, 2) if y is not None else None
+                    cantons[c]["participation"] = round(res.get("stimmbeteiligungInProzent") or 0, 2) or None
+                    if cantons[c]["accepte"] is None and y is not None and typ != "5":
+                        cantons[c]["accepte"] = y > 50
+        volk = r.get("volk")
+        if typ == "5":
+            statut = ("Contre-projet préféré" if volk == "8" else "Initiative préférée" if volk == "9"
+                      else "À venir" if day > today else "Résultat en attente")
+        else:
+            statut = ("Accepté" if r.get("annahme") == "1" else "Refusé" if r.get("annahme") == "0"
+                      else "À venir" if day > today else "Résultat en attente")
+        votes.append({
+            "id": r["anr"], "date": day, "titre": r.get("titel_kurz_f") or r.get("titel_off_f") or "",
+            "titre_off": r.get("titel_off_f") or "", "type": VOTE_TYPES.get(typ, typ), "statut": statut,
+            "oui": round(oui, 2) if oui is not None else None,
+            "participation": round(part, 2) if part is not None else None,
+            "cantons_oui": fnum(r.get("kt-ja")), "cantons_non": fnum(r.get("kt-nein")),
+            "cantons": cantons,
+            "mots_ordre": {label: PAROLES[r.get(f"p-{k}")] for k, label in SV_ACTORS if r.get(f"p-{k}") in PAROLES},
+            "conseil_federal": {"1": "pour", "2": "contre", "8": "contre-projet", "9": "initiative"}.get(r.get("br-pos")),
+            "parlement": {k: int(fnum(r.get(k)) or 0) for k in ("nrja", "nrnein", "srja", "srnein")},
+            "lien": r.get("swissvoteslink") or "",
+        })
+    match_campaigns(votes, campagnes)
+    votes.sort(key=lambda v: float(v["id"]))
+    votes.sort(key=lambda v: v["date"], reverse=True)
+    return votes
+
+
+# --------------------------------------------------------------------------
 # Historique : nouveautés et série temporelle
 # --------------------------------------------------------------------------
 
@@ -346,6 +476,14 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"CDF : {e}")
         meta["sources"].setdefault("efk", {})["statut"] = f"échec : {e}"[:200]
+
+    votes = load_json(OUT / "votations.json", None)
+    try:
+        votes = build_votes(money["campagnes"] if money else [])
+        meta["sources"]["swissvotes"] = {"statut": "ok", "maj": NOW.isoformat()}
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"swissvotes : {e}")
+        meta["sources"].setdefault("swissvotes", {})["statut"] = f"échec : {e}"[:200]
 
     if lobby is None and money is None:
         print("Aucune source disponible :", *errors, sep="\n", file=sys.stderr)
@@ -390,8 +528,11 @@ def main() -> int:
         dump(OUT / "argent.json", money)
     if lobby:
         dump(OUT / "lobby.json", lobby)
+    if votes is not None:
+        dump(OUT / "votations.json", votes)
     meta["genere"] = NOW.isoformat()
     meta["compteurs"] = {k: len(v) for src in (money or {}, lobby or {}) for k, v in src.items()}
+    meta["compteurs"]["votations"] = len(votes or [])
     dump(OUT / "meta.json", meta)
 
     print(json.dumps(meta, ensure_ascii=False, indent=1))

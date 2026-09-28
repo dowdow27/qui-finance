@@ -9,6 +9,8 @@
   --infl: #1F5F8B;       /* influence : bleu */
   --infl-soft: #DCE8F1;
   --focus: #F2B705;
+  /* groupes parlementaires (couleurs usuelles des partis) */
+  --f-G: #6FA83A; --f-S: #D93A3A; --f-GL: #B3AE1F; --f-ME: #EF8C00; --f-RL: #2F6DB3; --f-V: #1F6B35; --f-X: #9AA4AE;
   --radius-s: 4px;
   --radius-l: 14px;
   color-scheme: light;
@@ -20,11 +22,13 @@
   :root:not([data-theme="light"]) {
     --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
     --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark;
+    --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
   }
 }
 :root[data-theme="dark"] {
   --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
   --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark;
+  --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
 }
 *, *::before, *::after { box-sizing: inherit; }
 html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 64px); }
@@ -146,6 +150,41 @@ tr.click:hover td { background: color-mix(in srgb, var(--infl-soft) 55%, transpa
 .legend { display: flex; gap: 14px; font-size: .85rem; color: var(--muted); margin: 0 0 10px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 svg.line { width: 100%; height: auto; }
+
+/* Votations */
+.vote-day { margin: 0 0 26px; }
+.vote-day h3 { border-top: 2px solid var(--ink); padding-top: 12px; }
+.vote-row {
+  display: grid; gap: 6px; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 12px 14px; margin: 0 0 8px;
+}
+.vote-row:hover { border-color: var(--ink); }
+.vote-row .sub { color: var(--muted); font-size: .9rem; }
+.vr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.pill { display: inline-block; font-size: .8rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; background: var(--paper); border: 1px solid var(--rule); }
+.pill.yes { background: var(--infl); border-color: var(--infl); color: var(--card); }
+.pill.no { background: var(--money); border-color: var(--money); color: var(--card); }
+.yesno { position: relative; display: block; height: 10px; border-radius: 3px; background: var(--money-soft); overflow: hidden; }
+.yesno span { display: block; height: 100%; background: var(--infl); }
+.yesno::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; border-left: 2px solid var(--ink); }
+.cantons { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 4px; }
+.ct { display: grid; border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 5px 6px; background: var(--card); font-size: .8rem; line-height: 1.25; }
+.ct b { font-size: .9rem; }
+.sheet-panel h4 { margin: 14px 0 4px; font-size: 1rem; }
+.legend.wrap-l { flex-wrap: wrap; row-gap: 4px; }
+.legend b { color: var(--ink); }
+.legend .vacant { border: 1px dashed var(--muted); }
+
+/* Parlement : hémicycles et photos */
+svg.hemi { width: 100%; height: auto; display: block; margin: 0 0 10px; }
+svg.hemi .seat { cursor: pointer; }
+svg.hemi .seat:hover { stroke: var(--ink); stroke-width: 1.2; }
+.who { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; object-position: top; flex: none; background: var(--paper); }
+.elu-head { display: flex; gap: 16px; align-items: flex-start; }
+.portrait { margin: 8px 0 0; flex: none; text-align: center; }
+.portrait img { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; object-position: top; display: block; background: var(--card); }
+.portrait figcaption { font-size: .7rem; color: var(--muted); margin-top: 3px; }
 
 /* Nouveautés */
 .week { border-top: 2px solid var(--ink); padding: 14px 0 24px; }
