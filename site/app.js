@@ -53,7 +53,7 @@ function buildIndexes() {
 }
 
 /* ---------------- Navigation ---------------- */
-const TABS = ["chercher", "dossier", "jouer", "absences", "lobbyistes", "reseaux", "dons", "votations", "parlement", "tendances", "trends", "engager", "debats", "nouveautes"];
+const TABS = ["chercher", "dossier", "commission", "jouer", "absences", "lobbyistes", "reseaux", "dons", "votations", "parlement", "tendances", "trends", "engager", "debats", "nouveautes"];
 let TAB_CUR = "";
 function route() {
   const [tab, ...qs] = decodeURIComponent(location.hash.slice(1)).split(":");
@@ -70,6 +70,7 @@ function route() {
   if (t === "chercher" && q != null && $("#q").value !== q) { $("#q").value = q; search(); }
   if (t === "tendances") { renderClassements(); if (q) requestAnimationFrame(() => $(`#cl-${CSS.escape(q)}`)?.scrollIntoView({ block: "start" })); }
   if (t === "dossier") renderDossier(q);
+  if (t === "commission") renderCommission(q);
   if (t === "trends") renderTrends();
   if (t === "jouer") renderJouer(q);
   if (t === "absences") renderAbsences();
@@ -183,7 +184,7 @@ function sheetElu(e) {
   const lp = liensPotentiels().find((x) => x.e === e);
   const nav = [["#s-mandats", "Mandats"], e.conseil === "CN" ? ["#s-votes", "Votes"] : null, e.badges.length ? ["#s-badges", "Badges"] : null, ["#s-secteurs", "Secteurs"]].filter(Boolean);
   return `<div class="elu-head">${e.photo ? `<figure class="portrait"><img src="${esc(e.photo)}" alt="${esc(e.nom)}" width="84" height="84" loading="lazy" onerror="this.parentNode.remove()"><figcaption>© ParlCH</figcaption></figure>` : ""}
-  <div><h2>${esc(e.nom)}</h2><p class="note">${armoiries(e.canton, 16)}${esc(e.parti)}, ${esc(e.canton)}, ${esc(e.conseil)}${e.profession ? ". " + esc(e.profession) : ""}${e.commissions ? `. Commissions : ${esc(e.commissions)}` : ""}</p></div></div>
+  <div><h2>${esc(e.nom)}</h2><p class="note">${armoiries(e.canton, 16)}${esc(e.parti)}, ${esc(e.canton)}, ${esc(e.conseil)}${e.profession ? ". " + esc(e.profession) : ""}${e.commissions ? `. Commissions : ${comLinks(e.commissions)}` : ""}</p></div></div>
   <div class="kpis">${kpi(e.liens.length, "mandats en cours", "infl")}${kpi(paid.length, "rémunérés")}${kpi(known ? chf(known) : "–", "montants communiqués / an")}</div>
   <nav class="sheet-nav" aria-label="Dans cette fiche">${nav.map(([h, l]) => `<a href="${h}">${l}</a>`).join("")}${shareBtn(`fiche-${e.id}`, () => shareCard({ kicker: "Fiche d'élu", title: `${e.nom} (${e.parti}, ${e.canton}, ${e.conseil === "CN" ? "Conseil national" : "Conseil des États"})`, big: `${e.liens.length} mandats`, bigColor: "#1F5F8B", lines: [`dont ${paid.length} rémunérés, selon Lobbywatch.`, ...(lp ? [`${lp.n} lien${lp.n > 1 ? "s" : ""} d'intérêts potentiel${lp.n > 1 ? "s" : ""} : commission et mandat du même secteur.`] : []), "Qui finance qui ? Cherchez votre élu."], text: `${e.nom} : ${e.liens.length} mandats dont ${paid.length} rémunérés.`, file: `elu-${e.id}.png` }), "Partager")}</nav>
   ${API ? `<section id="elu-conf"><h3>Cote de confiance</h3><p class="note">Chargement…</p></section>` : ""}
@@ -1314,7 +1315,7 @@ function renderDossier(id) {
     <span class="sub">${x.ls.map((l) => `${esc(l.org)}${l.montant ? ` (${chf(l.montant)})` : ""}`).join(" · ")}${x.com ? ` · <b>siège à la ${esc(comLbl(x.com))}</b>` : ""}</span></li>`;
   const dest = {}; r.dons.forEach((x) => { const k = x.parti || (x.cat === "Votation" ? `Votations, camp du ${x.camp === "Pour" ? "oui" : "non"}` : x.cat === "Parti" ? "Autres partis" : x.cat); dest[k] = (dest[k] || 0) + (x.montant || 0); });
   const faceTot = sum(r.faceDons, (x) => x.montant);
-  box.innerHTML = `<nav class="subnav" aria-label="Dossiers"><span class="subnav-label">Dossiers :</span>${DOSSIERS.map((x) => `<a href="#dossier:${x.id}"${x === d ? ' class="on"' : ""}>${esc(x.nom)}</a>`).join("")}</nav>
+  box.innerHTML = `<nav class="subnav" aria-label="Dossiers"><span class="subnav-label">Dossiers :</span>${DOSSIERS.map((x) => `<a href="#dossier:${x.id}"${x === d ? ' class="on"' : ""}>${esc(x.nom)}</a>`).join("")}<a href="#commission">Commissions</a></nav>
   <p class="eyebrow">Dossier · ${esc(d.nom)}</p>
   <h1 class="hero dos-hero">${esc(big)} ${esc(suite)}</h1>
   <p class="dos-lede">${esc(dosPhrase(d))}</p>
@@ -1324,6 +1325,7 @@ function renderDossier(id) {
     ${pp.length ? `<p class="hint">Par parti : part des élus fédéraux du parti payés par ${esc(d.qui)}</p>${bars(pp, "m", pctInt)}${petits.length ? `<p class="note">Petits partis : ${petits.map(([p, n]) => `${esc(p)} ${n} sur ${sieges[p]}`).join(", ")}.</p>` : ""}` : ""}
     ${r.elus.length ? `<p class="hint">Par élu</p>${listMore(r.elus.map(eluRow), 10, "élus")}` : `<p class="note">Aucun mandat rémunéré déclaré dans ce secteur.</p>`}
     ${d.face && r.face.length ? `<details class="more"><summary>Et ${r.face.length} élu${r.face.length > 1 ? "s" : ""} payé${r.face.length > 1 ? "s" : ""} par ${esc(d.face.qui)}</summary>${listMore(r.face.map(eluRow), 10, "élus")}</details>` : ""}
+    ${r.coms.length ? `<p class="note">Voir la commission : ${r.coms.flatMap((c) => [`${c}-N`, `${c}-S`]).map((k) => `<a href="#commission:${k}">${esc(comNom(k))} (${esc(comSigle(k))})</a>`).join(" · ")}</p>` : ""}
     <p class="note">Mandats rémunérés déclarés, classés par Lobbywatch. Un mandat « non communiqué » n'est pas compté, même s'il est peut-être payé. Un mandat n'est pas une faute : c'est une information.</p>${stamp("Lobbywatch")}</section>
   <section class="card"><p class="eyebrow-s">L'argent</p><h2 class="qs-q">Combien donnent ${esc(d.donQui)} ?</h2>
     <div class="kpis">${kpi(`${short(r.total)} CHF`, "dons déclarés depuis 2023", "money")}${kpi(r.top.length, "donateurs")}${d.face?.donSecteurs ? kpi(`${short(faceTot)} CHF`, `donnés par ${d.face.qui}`, "infl") : ""}</div>
@@ -1343,6 +1345,55 @@ async function fillDossierCN(d, r) {
     return `<li><span>${linkBtn("scrutin", s[0], s[4] || s[3])}</span><span class="nowrap"><b class="money">${a.pc == null ? "–" : pctInt(a.pc)}</b> / ${b.pc == null ? "–" : pctInt(b.pc)}</span>
       <span class="sub">${esc(dateFr(s[1]))} · ${esc(s[5])} · élus payés par le secteur : ${a.o} oui, ${a.n} non · autres élus : ${b.o} oui, ${b.n} non. Oui = ${esc(trVote(s[6]) || "–")}</span></li>`; }).join("")}</ul>
     <p class="note">Part de oui chez les ${payes.size} élus du National payés par ${esc(d.qui)}, puis chez tous les autres. Un écart peut venir de leur parti plutôt que du mandat : ouvrez un vote pour le détail par groupe.</p>`;
+}
+
+/* ---------------- Commissions : qui siège, et qui est lié au secteur qu'elle traite ---------------- */
+/* Membres actuels (Lobbywatch). « Lié » = mandat rémunéré ou badge donné à un lobbyiste dans un groupe d'intérêts que Lobbywatch rattache à la commission (même calcul que liensPotentiels). Les votes en commission ne sont pas publics. */
+const COM_FR = { SGK: ["CSSS", "Commission de la sécurité sociale et de la santé publique"], WAK: ["CER", "Commission de l'économie et des redevances"], KVF: ["CTT", "Commission des transports et des télécommunications"],
+  UREK: ["CEATE", "Commission de l'environnement, de l'aménagement du territoire et de l'énergie"], SPK: ["CIP", "Commission des institutions politiques"], SiK: ["CPS", "Commission de la politique de sécurité"],
+  APK: ["CPE", "Commission de politique extérieure"], WBK: ["CSEC", "Commission de la science, de l'éducation et de la culture"], RK: ["CAJ", "Commission des affaires juridiques"], FK: ["CdF", "Commission des finances"], GPK: ["CdG", "Commission de gestion"] };
+const comSplit = (code) => { const m = /^([A-Za-z]+)-([NS])$/.exec(code.trim()); return m && COM_FR[m[1]] ? { base: m[1], ch: m[2] } : null; };
+const comSigle = (code) => { const c = comSplit(code); return c ? `${COM_FR[c.base][0]}-${c.ch === "N" ? "N" : "E"}` : code.trim(); };
+const comNom = (code) => { const c = comSplit(code); return c ? `${COM_FR[c.base][1]} du ${c.ch === "N" ? "Conseil national" : "Conseil des États"}` : code.trim(); };
+const comLinks = (s) => (s || "").split(",").map((x) => x.trim()).filter(Boolean).map((x) => comSplit(x) ? `<a href="#commission:${esc(x)}" data-close title="${esc(comNom(x))}">${esc(comSigle(x))}</a>` : esc(x)).join(", ");
+function comData(code) {
+  const c = comSplit(code); if (!c) return null;
+  const membres = L.elus.filter((e) => (e.commissions || "").split(",").some((x) => x.trim() === code));
+  const lp = new Map(liensPotentiels().map((x) => [x.e, x.hits.filter((h) => h.com === c.base)]));
+  const rows = membres.map((e) => ({ e, hits: lp.get(e) || [] })).sort((a, b) => b.hits.length - a.hits.length || a.e.nom.localeCompare(b.e.nom));
+  const groupes = Object.entries(L.commissions || {}).filter(([, v]) => v.includes(c.base)).map(([g]) => g);
+  return { code, c, rows, lies: rows.filter((r) => r.hits.length).length, groupes };
+}
+const COM_CODES = () => Object.keys(COM_FR).flatMap((b) => ["N", "S"].map((ch) => `${b}-${ch}`)).filter((k) => comData(k)?.groupes.length && comData(k).rows.length);
+
+function renderCommission(code) {
+  const box = $("#commission"); if (!box) return;
+  const d = code && comData(code);
+  if (box.dataset.id !== (code || "")) window.scrollTo(0, 0); box.dataset.id = code || "";
+  const head = `<nav class="subnav" aria-label="Dossiers"><span class="subnav-label">Dossiers :</span>${DOSSIERS.map((x) => `<a href="#dossier:${x.id}">${esc(x.nom)}</a>`).join("")}<a href="#commission"${d ? "" : ' class="on"'}>Commissions</a></nav>`;
+  if (!d) {
+    const all = COM_CODES().map(comData).sort((a, b) => b.lies / b.rows.length - a.lies / a.rows.length);
+    box.innerHTML = `${head}<p class="eyebrow">Commissions parlementaires</p><h1 class="hero dos-hero">Qui prépare les lois, et qui les paie ?</h1>
+      <p class="dos-lede">Chaque loi passe d'abord par une commission, qui siège à huis clos. Pour chacune : combien de ses membres ont un mandat rémunéré ou font entrer un lobbyiste dans le secteur qu'elle traite.</p>
+      <div class="grid une dos-grid">${all.map((x) => `<a class="card une-card" href="#commission:${x.code}"><p class="eyebrow-s">${esc(comSigle(x.code))}</p><p class="big money">${x.lies} sur ${x.rows.length}</p><h3>${esc(comNom(x.code))}</h3><span class="go">Voir →</span></a>`).join("")}</div>
+      <p class="note">Membres actuels selon Lobbywatch. Secteurs rattachés à chaque commission par Lobbywatch ; les commissions des affaires juridiques, des finances et de gestion n'en ont pas. L'économie couvre beaucoup de secteurs : presque tous ses membres y ont un lien. Un lien n'est pas une faute : c'est une information.</p>${stamp("Lobbywatch")}`;
+    return;
+  }
+  const sieges = {}, lies = {}; d.rows.forEach((r) => { sieges[r.e.parti] = (sieges[r.e.parti] || 0) + 1; if (r.hits.length) lies[r.e.parti] = (lies[r.e.parti] || 0) + 1; });
+  const petits = Object.entries(sieges).filter(([, n]) => n < 3);  // 1 sur 1 = 100 % : les petites délégations à part
+  const pp = Object.entries(sieges).filter(([, n]) => n >= 3).map(([p, n]) => ({ label: `${p} : ${lies[p] || 0} sur ${n}`, value: 100 * (lies[p] || 0) / n, cls: `f-${fcls(PARTI_F[p])}` })).sort((a, b) => b.value - a.value);
+  const row = (r) => `<li><span>${linkBtn("elu", r.e.id, r.e.nom)} <small class="note">${esc(r.e.parti)}, ${esc(r.e.canton)}</small></span><span class="tag ${r.hits.length ? "paid" : ""}">${r.hits.length ? `${r.hits.length} lien${r.hits.length > 1 ? "s" : ""}` : "aucun lien"}</span>
+    ${r.hits.length ? `<span class="sub">${r.hits.map((h) => h.type === "mandat" ? `mandat rémunéré chez ${esc(h.org)}${h.montant ? ` (${chf(h.montant)})` : ""}` : `badge donné à ${esc(h.nom)} (${esc(h.org)})`).join(" · ")}</span>` : ""}</li>`;
+  const sigle = comSigle(d.code), autre = `${d.c.base}-${d.c.ch === "N" ? "S" : "N"}`;
+  const big = `${d.lies} sur ${d.rows.length}`;
+  box.innerHTML = `${head}<p class="eyebrow">Commission · ${esc(sigle)}</p><h1 class="hero dos-hero">${esc(comNom(d.code))}</h1>
+    <p class="dos-lede"><b class="money">${esc(big)} membres</b> ont un mandat rémunéré ou font entrer un lobbyiste dans le secteur qu'elle traite.</p>
+    <div class="answers">${shareBtn(`com-${d.code}`, () => shareCard({ kicker: `Commission · ${sigle}`, title: comNom(d.code), big, lines: ["membres ont un mandat rémunéré ou font entrer un lobbyiste dans le secteur qu'elle traite.", "Chaque loi y passe à huis clos."], text: `${comNom(d.code)} : ${big} membres liés au secteur qu'elle traite.`, file: `commission-${sigle}.png`, link: `${SITE_URL}#commission:${d.code}` }))}
+      ${comData(autre)?.rows.length ? `<a class="btn ghost" href="#commission:${autre}">${esc(comSigle(autre))} (${d.c.ch === "N" ? "États" : "National"})</a>` : ""}<a class="link" href="#commission">Toutes les commissions →</a></div>
+    <section class="card"><p class="eyebrow-s">Les membres</p><h2 class="qs-q">Qui y siège ?</h2>
+      ${pp.length ? `<p class="hint">Par parti : membres liés au secteur</p>${bars(pp, "m", pctInt)}` : ""}${petits.length ? `<p class="note">Petites délégations : ${petits.map(([p, n]) => `${esc(p)} ${lies[p] || 0} sur ${n}`).join(", ")}.</p>` : ""}<p class="hint">Par membre</p><ul class="list">${d.rows.map(row).join("")}</ul>${stamp("Lobbywatch")}</section>
+    <section class="card"><p class="eyebrow-s">Secteurs</p><h2 class="qs-q">Ce qu'elle traite</h2><p class="note">Groupes d'intérêts rattachés à cette commission par Lobbywatch : ${d.groupes.map(esc).join(", ")}.</p>
+      <p class="note">Lien = mandat rémunéré déclaré ou badge d'accès donné à un représentant d'intérêts dans l'un de ces groupes. Un mandat « non communiqué » n'est pas compté. Les votes en commission ne sont pas publics. Un lien n'est pas une faute : c'est une information.</p>${stamp("Lobbywatch")}</section>`;
 }
 
 /* ---------------- Réseaux (carte à bulles élus × organisations) ---------------- */
