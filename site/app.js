@@ -1244,6 +1244,9 @@ const DOSSIERS = [
     groupes: ["Caisses maladie"], face: { qui: "les associations de patients", groupes: ["Patient·e·x·s"] },
     donSecteurs: ["Santé et pharma"], donRx: /curafutura|santesuisse|prio swiss|groupe mutuel|helsana|\bcss\b|sanitas|visana|swica|concordia|assura|krankenvers/, donQui: "les caisses maladie, les médecins et la pharma",
     vRx: /prime|couts dans le systeme de sante|prestations ambulatoires/, sRx: /assurance maladie|lamal|lsamal/,
+    // Actualité : affichée en tête jusqu'à la date « jusqu », puis disparaît seule. Chiffre officiel à reprendre du communiqué OFSP dès sa publication.
+    actu: { date: "2026-09-29", jusqu: "2026-11-30", titre: "Les primes maladie augmentent d'environ 5 % en 2027.", source: "Annonce de l'OFSP, 29 septembre 2026 (Frapp)", url: "https://frapp.ch/fr/articles/stories/liveticker-annonce-des-primes-dassurance-maladie-2027",
+      conseil: "Pour changer de caisse, résiliez avant le 30 novembre. Comparateur officiel :", conseilUrl: "https://www.priminfo.admin.ch/fr/praemien", conseilLbl: "priminfo.admin.ch" },
     une: (r) => [`${r.elus.length} élus`, "payés par des caisses maladie", `${r.nCom} d'entre eux siègent dans la commission de la santé, qui prépare les lois sur les primes.`] },
   { id: "loyers", nom: "Loyers", q: "Loyers : qui paie vos élus ?", qui: "l'immobilier",
     groupes: ["Immobilier et propriétaires fonciers"], face: { qui: "les associations de locataires", groupes: ["Locataire·x·s"] },
@@ -1289,15 +1292,19 @@ function dossierDuMoment() {
   const vot = DOSSIERS.map((d) => ({ d, v: prochaineVot(d) })).filter((x) => x.v).sort((a, b) => a.v.date.localeCompare(b.v.date))[0];  // une votation à venir passe devant
   return vot?.d || DOSSIERS[Math.floor(Date.parse(today()) / 6048e5) % DOSSIERS.length];
 }
+const actuOf = (d) => { const j = new Date().toISOString().slice(0, 10); return d.actu && j >= d.actu.date && j <= d.actu.jusqu ? d.actu : null; };  // date du jour réelle, pas celle des données
+const actuBox = (a, court) => `<p class="actu">${court ? `Source : <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.source)}</a>` : `<b>${esc(dateFr(a.date))}</b> · ${esc(a.titre)} <a href="${esc(a.url)}" target="_blank" rel="noopener">Source</a>`}${a.conseil ? `<br><span>${esc(a.conseil)} <a href="${esc(a.conseilUrl)}" target="_blank" rel="noopener">${esc(a.conseilLbl)}</a></span>` : ""}</p>`;
 const dosPhrase = (d) => { const [, , phrase] = d.une(dossierData(d)), v = prochaineVot(d); return `${phrase}${v ? ` Le ${dateFr(v.date)}, vous votez : « ${v.titre} ».` : ""}`; };
 const dosShare = (d) => { const r = dossierData(d), [big, suite] = d.une(r);
-  return shareBtn(`dos-${d.id}`, () => shareCard({ kicker: `Dossier · ${d.nom}`, title: d.q, big, lines: [`${suite}.`, dosPhrase(d)], text: `${d.q} ${big} ${suite}.`, file: `dossier-${d.id}.png`, link: `${SITE_URL}#dossier:${d.id}` })); };
+  const a = actuOf(d);
+  return shareBtn(`dos-${d.id}`, () => shareCard({ kicker: `Dossier · ${d.nom}`, title: a ? a.titre : d.q, big, lines: [`${suite}.`, dosPhrase(d)], text: `${d.q} ${big} ${suite}.`, file: `dossier-${d.id}.png`, link: `${SITE_URL}#dossier:${d.id}` })); };
 
 function renderDossiersHome() {
   const box = $("#dos-home"); if (!box || !L.elus.length) return;
-  const d = dossierDuMoment(), [big, suite] = d.une(dossierData(d));
-  box.innerHTML = `<p class="eyebrow">Dossier du moment · ${esc(d.nom)}</p>
-    <h1 class="hero dos-hero"><a href="#dossier:${d.id}">${esc(big)} ${esc(suite)}</a></h1>
+  const d = dossierDuMoment(), [big, suite] = d.une(dossierData(d)), a = actuOf(d);
+  box.innerHTML = `<p class="eyebrow">${a ? `Actualité · ${esc(dateFr(a.date))}` : `Dossier du moment · ${esc(d.nom)}`}</p>
+    <h1 class="hero dos-hero"><a href="#dossier:${d.id}">${a ? `${esc(a.titre)}<br><span class="money">${esc(big)} ${esc(suite)}.</span>` : `${esc(big)} ${esc(suite)}`}</a></h1>
+    ${a ? actuBox(a, true) : ""}
     <p class="dos-lede">${esc(dosPhrase(d))} <a class="go" href="#dossier:${d.id}">Lire le dossier →</a></p>
     <div class="grid une dos-grid">${DOSSIERS.filter((x) => x !== d).map((x) => { const [b, s] = x.une(dossierData(x));
       return `<a class="card une-card" href="#dossier:${x.id}"><p class="eyebrow-s">${esc(x.nom)}</p><p class="big money">${esc(b)}</p><h3>${esc(s)}</h3><span class="go">Lire →</span></a>`; }).join("")}</div>`;
@@ -1318,6 +1325,7 @@ function renderDossier(id) {
   box.innerHTML = `<nav class="subnav" aria-label="Dossiers"><span class="subnav-label">Dossiers :</span>${DOSSIERS.map((x) => `<a href="#dossier:${x.id}"${x === d ? ' class="on"' : ""}>${esc(x.nom)}</a>`).join("")}<a href="#commission">Commissions</a></nav>
   <p class="eyebrow">Dossier · ${esc(d.nom)}</p>
   <h1 class="hero dos-hero">${esc(big)} ${esc(suite)}</h1>
+  ${actuOf(d) ? actuBox(actuOf(d)) : ""}
   <p class="dos-lede">${esc(dosPhrase(d))}</p>
   <div class="answers">${dosShare(d)}${API ? `<a class="btn ghost" href="#debats">En débattre</a>` : ""}<a class="link" href="#chercher">Et vos élus ? →</a></div>
   <section class="card"><p class="eyebrow-s">Les élus</p><h2 class="qs-q">Qui est payé par ${esc(d.qui)} ?</h2>
