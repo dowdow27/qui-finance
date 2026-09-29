@@ -591,7 +591,7 @@ function wrapLines(ctx, text, maxW) {
   for (const w of String(text).split(/\s+/)) { const t = line ? `${line} ${w}` : w; if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
   if (line) out.push(line); return out;
 }
-async function shareCard({ kicker = "Qui finance ?", title, big, bigColor = "#C8202A", lines = [], text = "", file = "qui-finance.png", link = "", units = null }) {
+async function shareCard({ kicker = "Qui finance ?", title, big, bigColor = "#B3261E", lines = [], text = "", file = "qui-finance.png", link = "", units = null }) {
   await document.fonts?.ready;
   const W = 1080, H = 1350, c = document.createElement("canvas"); c.width = W; c.height = H;
   const x = c.getContext("2d"), F = (w, s) => `${w} ${s}px "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif`;
@@ -690,7 +690,7 @@ function renderClassements() {
   if (mp.length) cards.push(card(CL["multi-partis"], "Donateurs qui ont donné à au moins deux partis (hors campagnes de votation).",
     `${listMore(mp.slice(0, 12).map((x) => `<li><span>${linkBtn("donor", x.g.nom, x.g.nom)}</span><span class="amount money">${chf(sum(x.par, (p) => p[1]))}</span>
       <span class="sub">${x.par.map(([p, v]) => `${esc(p)} ${short(v)}`).join(" · ")}</span></li>`), 5, "donateurs")}
-    ${shareBtn("multi-partis", () => shareCard({ kicker: "Ils financent plusieurs partis", title: `${mp[0].g.nom} a donné à ${mp[0].par.length} partis`, big: short(sum(mp[0].par, (p) => p[1])) + " CHF", bigColor: "#C8202A", lines: mp[0].par.map(([p, v]) => `${p} : ${chf(v)}`), text: `${mp[0].g.nom} finance ${mp[0].par.length} partis.`, file: "multi-partis.png", link: clLink("multi-partis") }))}`, false, "multi-partis"));
+    ${shareBtn("multi-partis", () => shareCard({ kicker: "Ils financent plusieurs partis", title: `${mp[0].g.nom} a donné à ${mp[0].par.length} partis`, big: short(sum(mp[0].par, (p) => p[1])) + " CHF", bigColor: "#B3261E", lines: mp[0].par.map(([p, v]) => `${p} : ${chf(v)}`), text: `${mp[0].g.nom} finance ${mp[0].par.length} partis.`, file: "multi-partis.png", link: clLink("multi-partis") }))}`, false, "multi-partis"));
   // Cumul de mandats rémunérés
   const paidOf = (e) => e.liens.filter((l) => l.statut === "remunere").length;
   const cumul = L.elus.map((e) => ({ e, paid: paidOf(e) })).sort((a, b) => b.paid - a.paid || b.e.liens.length - a.e.liens.length).slice(0, 15);
@@ -980,7 +980,7 @@ async function renderAbsences() {
   const moy = sum(rows, (r) => r.taux) / rows.length;
   const moyE = sum(rows, (r) => r.tauxE) / rows.length;
   $("#s-abs").innerHTML = `${list.length} élus · en moyenne, un conseiller national manque <b class="money">${num1(moy)} %</b> des votes sans excuse et <b>${num1(moyE)} %</b> avec excuse ${shareBtn("absences-top", () => { const t = [...rows].sort((a, b) => b.taux - a.taux).slice(0, 3);
-    return shareCard({ kicker: "Qui manque le plus de votes ?", title: "Conseil national : les absences non excusées les plus fréquentes depuis décembre 2023", big: `${pctInt(t[0].taux)}`, bigColor: "#C8202A", lines: t.map((r, i) => `${i + 1}. ${r.e.nom} (${r.e.parti}, ${r.e.canton}) : ${nf.format(r.s.absences)} votes manqués sur ${nf.format(r.s.scrutins)}`).concat([`Moyenne : ${num1(moy)} %. Les données ne disent pas pourquoi un élu était absent.`]), text: "Qui manque le plus de votes au Conseil national ?", file: "absences.png" }); })}`;
+    return shareCard({ kicker: "Qui manque le plus de votes ?", title: "Conseil national : les absences non excusées les plus fréquentes depuis décembre 2023", big: `${pctInt(t[0].taux)}`, bigColor: "#B3261E", lines: t.map((r, i) => `${i + 1}. ${r.e.nom} (${r.e.parti}, ${r.e.canton}) : ${nf.format(r.s.absences)} votes manqués sur ${nf.format(r.s.scrutins)}`).concat([`Moyenne : ${num1(moy)} %. Les données ne disent pas pourquoi un élu était absent.`]), text: "Qui manque le plus de votes au Conseil national ?", file: "absences.png" }); })}`;
   box.innerHTML = `<thead><tr><th>Élu</th><th class="num">Non excusées</th><th class="num">Excusées</th><th class="num">Total</th></tr></thead>
     <tbody>${list.map((r) => `<tr class="click" data-open="elu" data-key="${r.e.id}"><td><span class="who">${avatar(r.e)}<span><strong>${esc(r.e.nom)}</strong><br><small>${esc(r.e.parti)}, ${esc(r.e.canton)}</small>${ctxNote(r.e)}</span></span></td>
       <td class="num"><strong class="money">${pct(r.taux)}</strong><br><small>${nf.format(r.s.absences)} votes</small></td>
@@ -1070,7 +1070,7 @@ function qsResult(r, vient) {
   const po = n ? Math.round(100 * r.oui / n) : 0, mine = r.mon_vote === 1 ? "oui" : "non";
   box.innerHTML = `<div class="qs-bar" role="img" aria-label="${po} % oui"><span style="width:${po}%"></span></div>
     <p class="summary"><b class="infl">${po} % oui</b> · <b class="money">${100 - po} % non</b> · ${n} réponse${n > 1 ? "s" : ""}${vient ? ", la vôtre comprise" : ""}. Vous pouvez changer d'avis.</p>
-    <div class="answers">${shareBtn("qsem", () => shareCard({ kicker: "La question de la semaine", title: QSEM.question, big: `${po} % oui`, bigColor: r.mon_vote === 1 ? "#1F5F8B" : "#C8202A", lines: [`${QSEM.chiffre} : ${QSEM.fait}.`, `Moi, j'ai répondu ${mine}. Et toi ?`], text: `${QSEM.question} ${po} % de oui sur Qui finance ? Moi : ${mine}. Et toi ?`, file: "question.png" }))}
+    <div class="answers">${shareBtn("qsem", () => shareCard({ kicker: "La question de la semaine", title: QSEM.question, big: `${po} % oui`, bigColor: r.mon_vote === 1 ? "#1F5F8B" : "#B3261E", lines: [`${QSEM.chiffre} : ${QSEM.fait}.`, `Moi, j'ai répondu ${mine}. Et toi ?`], text: `${QSEM.question} ${po} % de oui sur Qui finance ? Moi : ${mine}. Et toi ?`, file: "question.png" }))}
       <button class="btn" data-qnext>Question suivante →</button><button class="btn ghost" data-propose="classement:${esc(QSEM.cl)}">Défendre ma position</button></div>`;
 }
 async function voteSondage(btn) {
@@ -1652,7 +1652,7 @@ async function shareNet() {
   await document.fonts?.ready;
   const W = 1080, H = 1350, c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
   const Fnt = (w, s) => `${w} ${s}px "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif`;
-  x.fillStyle = "#F3F4F1"; x.fillRect(0, 0, W, H); x.fillStyle = "#C8202A"; x.fillRect(0, 0, W / 2, 20); x.fillStyle = "#1F5F8B"; x.fillRect(W / 2, 0, W / 2, 20);
+  x.fillStyle = "#F3F4F1"; x.fillRect(0, 0, W, H); x.fillStyle = "#B3261E"; x.fillRect(0, 0, W / 2, 20); x.fillStyle = "#1F5F8B"; x.fillRect(W / 2, 0, W / 2, 20);
   x.fillStyle = "#5F6873"; x.font = Fnt(700, 32); x.fillText("QUI FINANCE ? · RÉSEAUX", 60, 100);
   x.fillStyle = "#16202A"; x.font = Fnt(800, 54); let y = 170; for (const l of wrapLines(x, NET.titre, W - 120).slice(0, 2)) { x.fillText(l, 60, y); y += 62; }
   const [x0, y0, w, h] = NET.box, top = y + 10, area = [60, top, W - 120, H - top - 170], s = Math.min(area[2] / w, area[3] / h);

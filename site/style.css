@@ -4,14 +4,14 @@
   --ink: #16202A;
   --muted: #5F6873;
   --rule: #D6DAD4;
-  --money: #C8202A;      /* argent : rouge fédéral */
+  --money: #B3261E;      /* argent : rouge adouci (le rouge vif #DA291C reste réservé au logo) */
   --money-soft: #F6DCDD;
   --infl: #1F5F8B;       /* influence : bleu */
   --infl-soft: #DCE8F1;
   --focus: #F2B705;
   /* groupes parlementaires (couleurs usuelles des partis) */
   --f-G: #6FA83A; --f-S: #D93A3A; --f-GL: #B3AE1F; --f-ME: #EF8C00; --f-RL: #2F6DB3; --f-V: #1F6B35; --f-X: #9AA4AE;
-  --yes: #1F5F8B; --no: #C8202A; --abst: #E0A100; --absent: #C9CEC6; --excuse: #8C959E;
+  --yes: #1F5F8B; --no: #B3261E; --abst: #E0A100; --absent: #C9CEC6; --excuse: #8C959E;
   /* Échelle typographique : six tailles, pas une de plus */
   --fs-display: clamp(2rem, 4.6vw, 3.25rem);  /* titre de page (h1) */
   --fs-h2: clamp(1.5rem, 3vw, 2rem);          /* titre de section hors encart */
@@ -20,7 +20,7 @@
   --fs-sm: .875rem;                            /* notes, détails, légendes */
   --fs-label: .75rem;                          /* étiquettes en capitales */
   --fs-big: clamp(2rem, 4vw, 2.75rem);        /* grands chiffres */
-  --band: #C8202A;  /* bandeau des dossiers : texte blanc, garder un rouge foncé */
+  --band: #16202A;  /* bandeau des dossiers : encre (choix du 29.09.2026, le rouge plein piquait les yeux) */
   --radius-s: 0;    /* direction « Affiche » : pas d'arrondi, la grille et les filets font la séparation */
   --radius-l: 0;
   color-scheme: light;
@@ -31,14 +31,14 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
-    --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark; --band: #A51D26;
+    --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark; --band: #26303B;
     --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
     --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552; --excuse: #6B7580;
   }
 }
 :root[data-theme="dark"] {
   --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
-  --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark; --band: #A51D26;
+  --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark; --band: #26303B;
   --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
   --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552; --excuse: #6B7580;
 }
