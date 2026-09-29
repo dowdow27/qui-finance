@@ -72,6 +72,7 @@ Un push sur ces fichiers relance la construction du site.
 - Données CDF : « Open use », citer la source.
 - Données Lobbywatch : CC BY-SA 4.0, citer Lobbywatch et partager aux mêmes conditions.
 - Données Swissvotes : CC BY 4.0, citer « Swissvotes, Année politique suisse, Université de Berne ». Résultats cantonaux de l'OFS : « Open use ».
+- Répertoire officiel des localités (`site/npa.json`, recherche par NPA) : swisstopo, « Open use », citer la source.
 - Armoiries des cantons (`site/img/cantons/`) : fichiers de Wikimedia Commons, domaine public. Affichées à titre d'information, jamais comme emblème du site.
 - Photos des parlementaires : © ParlCH (Services du Parlement), usage gratuit à des fins d'information avec mention de la source. Elles sont affichées depuis parlament.ch, pas copiées dans le dépôt.
 - Code : GNU AGPL v3 (voir `LICENSE`). Toute version modifiée mise en ligne doit publier son code source sous la même licence. Les données restent sous la licence de leur source (CC BY-SA 4.0 pour tout ce qui dérive de Lobbywatch).

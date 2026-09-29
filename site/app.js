@@ -1083,13 +1083,31 @@ async function voteSondage(btn) {
 
 /* ---------------- Accueil : vos élus ---------------- */
 /* La promesse du site : on ne choisit ni son canton ni les objets soumis au vote, mais on peut voir qui les paie. */
+/* Recherche par NPA ou localité (site/npa.json, répertoire officiel des localités de swisstopo, scripts/npa.py) */
+let NPA = null;
+const loadNpa = () => (NPA ||= fetch("npa.json").then((r) => r.json()).then((rows) => rows.map(([p, l, c]) => ({ p, l: l.replace(/ \d+$/, ""), c: c.split("|"), n: norm(l) }))).catch(() => []));
+function setCanton(c, lieu) { store.set("qf-canton", c || ""); if (lieu != null) store.set("qf-lieu", lieu); renderMesElus(); renderSpotlight(); }
+async function npaSuggest(raw) {
+  const box = $("#npa-res"); if (!box) return;
+  const q = raw.trim(); if (q.length < 2) { box.innerHTML = ""; return; }
+  const rows = await loadNpa(), nq = norm(q), num = /^\d+$/.test(q);
+  const opts = [], seen = new Set();
+  for (const r of rows) {
+    if (num ? !r.p.startsWith(q) : !(r.n.startsWith(nq) || r.n.includes(` ${nq}`))) continue;
+    for (const c of r.c) { const k = `${r.p}|${r.l}|${c}`; if (!seen.has(k)) { seen.add(k); opts.push({ ...r, c }); } }
+  }
+  if ($("#home-npa")?.value.trim() !== q) return;  // une frappe plus récente a pris le relais
+  const cantons = uniq(opts.map((o) => o.c));
+  if (/^\d{4}$/.test(q) && cantons.length === 1) { setCanton(cantons[0], `${q} ${opts[0].l}`); return; }  // NPA complet, un seul canton : directement
+  box.innerHTML = opts.length ? opts.slice(0, 6).map((o) => `<button class="chip" data-canton="${o.c}" data-lieu="${esc(`${o.p} ${o.l}`)}">${esc(o.p)} ${esc(o.l)} <small>${o.c}</small></button>`).join("") + (cantons.length > 1 && num && q.length === 4 ? `<span class="note">Ce NPA couvre deux cantons : choisissez votre commune.</span>` : "") : `<span class="note">Aucune localité trouvée.</span>`;
+}
 async function renderMesElus() {
   const box = $("#mes-elus"); if (!box) return;
   const cantons = uniq(L.elus.map((e) => e.canton)).sort(), canton = cantons.includes(store.get("qf-canton")) ? store.get("qf-canton") : "";
   const elus = L.elus.filter((e) => e.canton === canton).sort((a, b) => (a.conseil === "CE" ? 0 : 1) - (b.conseil === "CE" ? 0 : 1) || a.nom.localeCompare(b.nom));
   const head = (body) => `<p class="eyebrow-s">Vos élus</p>
-    <div class="filters conf-filters"><label class="canton-pick">${canton ? armoiries(canton, 34) : ""}<span class="sr">Canton</span><select id="home-canton"><option value="">Votre canton…</option>${cantons.map((c) => `<option value="${c}"${c === canton ? " selected" : ""}>${c}</option>`).join("")}</select></label>${canton ? `<span class="summary">${elus.length} élus fédéraux, ${elus.filter((e) => e.conseil === "CE").length} aux États et ${elus.filter((e) => e.conseil === "CN").length} au National</span>` : ""}</div>${body}`;
-  if (!canton) { box.innerHTML = head(`<p class="note">Choisissez votre canton : vos conseillers aux États et nationaux, qui les paie, comment ils votent, s'ils sont présents. Et dites si vous leur faites confiance : un vote par personne et par élu, résultat public.</p>${stamp("Lobbywatch, Services du Parlement")}`); return; }
+    <div class="filters conf-filters"><label class="npa-pick"><span class="sr">NPA ou commune</span><input id="home-npa" type="search" inputmode="search" placeholder="Votre NPA ou votre commune" autocomplete="off"></label><span class="or">ou</span><label class="canton-pick">${canton ? armoiries(canton, 34) : ""}<span class="sr">Canton</span><select id="home-canton"><option value="">Votre canton…</option>${cantons.map((c) => `<option value="${c}"${c === canton ? " selected" : ""}>${c}</option>`).join("")}</select></label><div class="chips npa-res" id="npa-res"></div>${canton ? `<span class="summary">${store.get("qf-lieu") ? `${esc(store.get("qf-lieu"))} : ` : ""}${elus.length} élus fédéraux, ${elus.filter((e) => e.conseil === "CE").length} aux États et ${elus.filter((e) => e.conseil === "CN").length} au National</span>` : ""}</div>${body}`;
+  if (!canton) { box.innerHTML = head(`<p class="note">Tapez votre NPA ou choisissez votre canton : vos conseillers aux États et nationaux, qui les paie, comment ils votent, s'ils sont présents. Et dites si vous leur faites confiance : un vote par personne et par élu, résultat public.</p>${stamp("Lobbywatch, Services du Parlement")}`); return; }
   box.innerHTML = head(`<p class="note">Chargement…</p>`);
   const [p] = await Promise.all([loadParl(), API ? loadConf() : null]);
   if (store.get("qf-canton") !== canton) return;  // le canton a changé entre-temps
@@ -1339,12 +1357,13 @@ function renderDossier(id) {
   const dest = {}; r.dons.forEach((x) => { const k = x.parti || (x.cat === "Votation" ? `Votations, camp du ${x.camp === "Pour" ? "oui" : "non"}` : x.cat === "Parti" ? "Autres partis" : x.cat); dest[k] = (dest[k] || 0) + (x.montant || 0); });
   const faceTot = sum(r.faceDons, (x) => x.montant);
   box.innerHTML = `<nav class="subnav" aria-label="Dossiers"><span class="subnav-label">Dossiers :</span>${DOSSIERS.map((x) => `<a href="#dossier:${x.id}"${x === d ? ' class="on"' : ""}>${esc(x.nom)}</a>`).join("")}<a href="#commission">Commissions</a></nav>
-  <p class="eyebrow">Dossier · ${esc(d.nom)}</p>
+  <header class="dos-band"><p class="eyebrow">Dossier · ${esc(d.nom)}</p>
   <h1 class="hero dos-hero">${esc(big)} ${esc(suite)}</h1>
   ${actuOf(d) ? actuBox(actuOf(d)) : ""}
   <p class="dos-lede">${esc(dosPhrase(d))}</p>
-  <div class="answers">${dosShare(d)}${API ? `<a class="btn ghost" href="#debats">En débattre</a>` : ""}<a class="link" href="#chercher">Et vos élus ? →</a></div>
-  <section class="card"><p class="eyebrow-s">Les élus</p><h2 class="qs-q">Qui est payé par ${esc(d.qui)} ?</h2>
+  <div class="answers">${dosShare(d)}${API ? `<a class="btn ghost" href="#debats">En débattre</a>` : ""}<a class="link" href="#chercher">Et vos élus ? →</a></div></header>
+  <nav class="dos-tabs" aria-label="Dans ce dossier"><a href="#d-elus">Élus</a><a href="#d-argent">Argent</a>${r.vs.length ? `<a href="#d-vot">Votations</a>` : ""}<a href="#d-cn">Votes au National</a></nav>
+  <section class="card" id="d-elus"><p class="eyebrow-s">Les élus</p><h2 class="qs-q">Qui est payé par ${esc(d.qui)} ?</h2>
     <div class="kpis">${kpi(r.elus.length, "élus fédéraux payés", "money")}${kpi(sum(r.elus, (x) => x.ls.length), "mandats rémunérés")}${r.coms.length ? kpi(r.nCom, `siègent à la ${r.coms.map(comLbl).join(" ou à la ")}`) : ""}${d.face ? kpi(r.face.length, `payés par ${d.face.qui}`, "infl") : ""}</div>
     ${hemisSet(new Set(r.elus.map((x) => x.e)), `payés par ${d.qui}`)}
     ${pp.length ? `<p class="hint">${esc(pp[0].p)} en tête : ${pp[0].n} élus sur ${sieges[pp[0].p]} payés par ${esc(d.qui)} (${pctInt(pp[0].value)})</p><p class="note">Part des élus fédéraux de chaque parti.</p>${bars(pp, "m", pctInt)}${petits.length ? `<p class="note">Petits partis : ${petits.map(([p, n]) => `${esc(p)} ${n} sur ${sieges[p]}`).join(", ")}.</p>` : ""}` : ""}
@@ -1352,13 +1371,21 @@ function renderDossier(id) {
     ${d.face && r.face.length ? `<details class="more"><summary>Et ${r.face.length} élu${r.face.length > 1 ? "s" : ""} payé${r.face.length > 1 ? "s" : ""} par ${esc(d.face.qui)}</summary>${listMore(r.face.map(eluRow), 10, "élus")}</details>` : ""}
     ${r.coms.length ? `<p class="note">Voir la commission : ${r.coms.flatMap((c) => [`${c}-N`, `${c}-S`]).map((k) => `<a href="#commission:${k}">${esc(comNom(k))} (${esc(comSigle(k))})</a>`).join(" · ")}</p>` : ""}
     <p class="note">Mandats rémunérés déclarés, classés par Lobbywatch. Un mandat « non communiqué » n'est pas compté, même s'il est peut-être payé. Un mandat n'est pas une faute : c'est une information.</p>${stamp("Lobbywatch")}</section>
-  <section class="card"><p class="eyebrow-s">L'argent</p><h2 class="qs-q">Combien donnent ${esc(d.donQui)} ?</h2>
+  <section class="card" id="d-argent"><p class="eyebrow-s">L'argent</p><h2 class="qs-q">Combien donnent ${esc(d.donQui)} ?</h2>
     <div class="kpis">${kpi(`${short(r.total)} CHF`, "dons déclarés depuis 2023", "money")}${kpi(r.top.length, "donateurs")}${d.face?.donSecteurs ? kpi(`${short(faceTot)} CHF`, `donnés par ${d.face.qui}`, "infl") : ""}</div>
     ${r.top.length ? `<p class="hint">${esc(r.top[0][0])} en tête : ${short(r.top[0][1])} CHF déclarés</p>${barsMore(r.top.map(([k, v]) => ({ label: k, value: v, open: ["donor", k] })), "m")}${(() => { const top = Object.entries(dest).sort((a, b) => b[1] - a[1])[0]; return `<p class="hint">Où va l'argent ? ${esc(top[0])} en reçoit le plus : ${short(top[1])} CHF</p>`; })()}${bars(Object.entries(dest).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, cls: PARTI_F[k] ? `f-${fcls(PARTI_F[k])}` : "" })), "m")}` : `<p class="note">Aucun don déclaré.</p>`}
     <p class="note">Dons de plus de 15 000 CHF aux partis et dons aux campagnes de plus de 50 000 CHF, déclarés au Contrôle fédéral des finances. Secteur déduit du nom du donateur.</p>${stamp("CDF")}</section>
-  ${r.vs.length ? `<section class="card"><p class="eyebrow-s">Votations</p><h2 class="qs-q">Et le peuple ?</h2><div class="dos-votes">${r.vs.map(voteRow).join("")}</div>${stamp("Swissvotes, CDF")}</section>` : ""}
-  <section class="card"><p class="eyebrow-s">Conseil national</p><h2 class="qs-q">Les élus payés par ${esc(d.qui)} votent-ils comme les autres ?</h2><div id="dos-cn"><p class="note">Chargement…</p></div>${stamp("Services du Parlement, Lobbywatch")}</section>`;
-  fillDossierCN(d, r);
+  ${r.vs.length ? `<section class="card" id="d-vot"><p class="eyebrow-s">Votations</p><h2 class="qs-q">Et le peuple ?</h2><div class="dos-votes">${r.vs.map(voteRow).join("")}</div>${stamp("Swissvotes, CDF")}</section>` : ""}
+  <section class="card" id="d-cn"><p class="eyebrow-s">Conseil national</p><h2 class="qs-q">Les élus payés par ${esc(d.qui)} votent-ils comme les autres ?</h2><div id="dos-cn"><p class="note">Chargement…</p></div>${stamp("Services du Parlement, Lobbywatch")}</section>`;
+  fillDossierCN(d, r); dosTabsSpy();
+}
+/* Onglet actif selon la section visible */
+let DOS_IO = null;
+function dosTabsSpy() {
+  DOS_IO?.disconnect();
+  const links = [...document.querySelectorAll(".dos-tabs a")]; if (!links.length || !window.IntersectionObserver) return;
+  DOS_IO = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === `#${e.target.id}`)); }, { rootMargin: "-120px 0px -60% 0px" });
+  links.forEach((a) => { const t = $(a.getAttribute("href")); if (t) DOS_IO.observe(t); });
 }
 async function fillDossierCN(d, r) {
   const p = await loadParl(), box = $("#dos-cn"); if (!box) return;
@@ -1411,10 +1438,10 @@ function renderCommission(code) {
     ${r.hits.length ? `<span class="sub">${r.hits.map((h) => h.type === "mandat" ? `mandat rémunéré chez ${esc(h.org)}${h.montant ? ` (${chf(h.montant)})` : ""}` : `badge donné à ${esc(h.nom)} (${esc(h.org)})`).join(" · ")}</span>` : ""}</li>`;
   const sigle = comSigle(d.code), autre = `${d.c.base}-${d.c.ch === "N" ? "S" : "N"}`;
   const big = `${d.lies} sur ${d.rows.length}`;
-  box.innerHTML = `${head}<p class="eyebrow">Commission · ${esc(sigle)}</p><h1 class="hero dos-hero">${esc(comNom(d.code))}</h1>
+  box.innerHTML = `${head}<header class="dos-band"><p class="eyebrow">Commission · ${esc(sigle)}</p><h1 class="hero dos-hero">${esc(comNom(d.code))}</h1>
     <p class="dos-lede"><b class="money">${esc(big)} membres</b> ont un mandat rémunéré ou font entrer un lobbyiste dans le secteur qu'elle traite.</p>
     <div class="answers">${shareBtn(`com-${d.code}`, () => shareCard({ kicker: `Commission · ${sigle}`, title: comNom(d.code), big, lines: ["membres ont un mandat rémunéré ou font entrer un lobbyiste dans le secteur qu'elle traite.", "Chaque loi y passe à huis clos."], text: `${comNom(d.code)} : ${big} membres liés au secteur qu'elle traite.`, file: `commission-${sigle}.png`, link: `${SITE_URL}#commission:${d.code}` }))}
-      ${comData(autre)?.rows.length ? `<a class="btn ghost" href="#commission:${autre}">${esc(comSigle(autre))} (${d.c.ch === "N" ? "États" : "National"})</a>` : ""}<a class="link" href="#commission">Toutes les commissions →</a></div>
+      ${comData(autre)?.rows.length ? `<a class="btn ghost" href="#commission:${autre}">${esc(comSigle(autre))} (${d.c.ch === "N" ? "États" : "National"})</a>` : ""}<a class="link" href="#commission">Toutes les commissions →</a></div></header>
     <section class="card"><p class="eyebrow-s">Les membres</p><h2 class="qs-q">Qui y siège ?</h2>
       ${hemisSet(new Set(d.rows.filter((r) => r.hits.length).map((r) => r.e)), "membres liés au secteur", d.c.ch === "N" ? "CN" : "CE", new Set(d.rows.map((r) => r.e)))}
       ${pp.length ? `<p class="hint">${esc(pp[0].p)} en tête : ${pp[0].k} de ses ${pp[0].n} membres liés au secteur</p>${bars(pp, "m", pctInt)}` : ""}${petits.length ? `<p class="note">Petites délégations : ${petits.map(([p, n]) => `${esc(p)} ${lies[p] || 0} sur ${n}`).join(", ")}.</p>` : ""}<p class="hint">Par membre</p><ul class="list">${d.rows.map(row).join("")}</ul>${stamp("Lobbywatch")}</section>
@@ -1899,6 +1926,8 @@ document.addEventListener("click", (ev) => {
   const ar = ev.target.closest("[data-addref]"); if (ar) { const r = refFromKey(ar.dataset.addref); if (r && PROP.length < 6 && !PROP.some((x) => x.type === r.type && x.key === r.key)) PROP.push(r); renderPropRefs(); $("#p-ref-q").value = ""; $("#p-ref-res").innerHTML = ""; $("#p-ref-q").focus(); return; }
   const dr = ev.target.closest("[data-delref]"); if (dr) { PROP.splice(+dr.dataset.delref, 1); renderPropRefs(); return; }
   const s = ev.target.closest("[data-sort]"); if (s) { const [t, k] = s.dataset.sort.split(":"); const st = state[t]; st.dir = st.sort === k ? -st.dir : -1; st.sort = k; st.page = 0; (t === "dons" ? renderDons : renderParl)(); return; }
+  const dt = ev.target.closest(".dos-tabs a"); if (dt) { ev.preventDefault(); $(dt.getAttribute("href"))?.scrollIntoView({ block: "start", behavior: "smooth" }); return; }
+  const cp = ev.target.closest("[data-canton]"); if (cp) { setCanton(cp.dataset.canton, cp.dataset.lieu); return; }
   const sn = ev.target.closest(".sheet-nav a"); if (sn) { ev.preventDefault(); $(sn.getAttribute("href"))?.scrollIntoView({ block: "start", behavior: "smooth" }); return; }
   const a = ev.target.closest('a[href^="#"]');  // navigation interne : pushState plutôt que hashchange, pour que la mesure d'audience (Cloudflare) compte chaque onglet
   if (a && !ev.defaultPrevented && !ev.metaKey && !ev.ctrlKey && a.getAttribute("href").length > 1) { ev.preventDefault(); if (a.getAttribute("href") !== location.hash) history.pushState(null, "", a.getAttribute("href")); route(); }
@@ -1911,7 +1940,8 @@ document.addEventListener("submit", (ev) => {
 });
 document.addEventListener("input", (ev) => {
   if (ev.target.id === "sc-groupe") { focusScrutin(ev.target.value); return; }
-  if (ev.target.id === "home-canton") { store.set("qf-canton", ev.target.value); renderMesElus(); renderSpotlight(); return; }
+  if (ev.target.id === "home-canton") { store.set("qf-lieu", ""); setCanton(ev.target.value); return; }
+  if (ev.target.id === "home-npa") { npaSuggest(ev.target.value); return; }
   if (ev.target.id === "fv-niveau") { const c = ev.target.value === "cantonal"; $("#f-votes").hidden = c; $("#f-cant").hidden = !c; renderVotes(); return; }
   if (ev.target.id !== "p-ref-q") return;
   $("#p-ref-res").innerHTML = searchRefs(ev.target.value).map((r) => `<button type="button" class="ref-hit" data-addref="${esc(r.type)}:${esc(r.key)}"><small>${esc(REF_LABEL[r.type])}</small> ${esc(r.label)}</button>`).join("");

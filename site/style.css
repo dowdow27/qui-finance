@@ -20,6 +20,7 @@
   --fs-sm: .875rem;                            /* notes, détails, légendes */
   --fs-label: .75rem;                          /* étiquettes en capitales */
   --fs-big: clamp(2rem, 4vw, 2.75rem);        /* grands chiffres */
+  --band: #C8202A;  /* bandeau des dossiers : texte blanc, garder un rouge foncé */
   --radius-s: 0;    /* direction « Affiche » : pas d'arrondi, la grille et les filets font la séparation */
   --radius-l: 0;
   color-scheme: light;
@@ -30,14 +31,14 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
-    --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark;
+    --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark; --band: #A51D26;
     --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
     --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552; --excuse: #6B7580;
   }
 }
 :root[data-theme="dark"] {
   --paper: #12171D; --card: #1A2129; --ink: #E9ECEF; --muted: #9AA4AE; --rule: #2C3540;
-  --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark;
+  --money: #F0555D; --money-soft: #3A1E22; --infl: #6FAEDB; --infl-soft: #17303F; color-scheme: dark; --band: #A51D26;
   --f-G: #8BC653; --f-S: #F0625D; --f-GL: #D4CF45; --f-ME: #F7A433; --f-RL: #5E97DB; --f-V: #3E9B57; --f-X: #6B7580;
   --yes: #6FAEDB; --no: #F0555D; --abst: #F2C14E; --absent: #3A4552; --excuse: #6B7580;
 }
@@ -48,7 +49,7 @@ body {
   font: 400 16px/1.55 "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
 }
 /* Chiffres alignés seulement là où ils sont en colonne (sur tout le texte, la virgule s'élargit : « parler , calculés ») */
-table, .bar .val, .amount, .nowrap, .kpi b { font-variant-numeric: tabular-nums; }
+td.num, th.num { font-variant-numeric: tabular-nums; }  /* seulement en colonne : dans Schibsted, la virgule tabulaire s'élargit (« 4 , 3 mio ») */
 /* Trois façons de cliquer, pas plus : souligné fin = ouvrir une fiche ou un lien ; gras souligné rouge + flèche = aller vers une page ; encadré = action.
    Le bleu reste réservé aux données (oui, influence). */
 a, button.link { color: var(--ink); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--money) 55%, transparent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -522,3 +523,30 @@ svg.units { width: 100%; height: auto; display: block; margin: 8px 0 0; }
 .who > span { display: inline; }
 @media (max-width: 640px) { .hemis-duo { grid-template-columns: 1fr; } }
 .card p.hint + p.note { font-size: var(--fs-sm); margin: -4px 0 10px; }
+
+/* Bandeau en tête des dossiers et commissions (pleine largeur, sans débordement horizontal) */
+.dos-band { background: var(--band); color: #fff; box-shadow: 0 0 0 100vmax var(--band); clip-path: inset(0 -100vmax); padding: 4px 0 22px; margin: 28px 0 0; }
+.dos-band .eyebrow { color: #fff; margin-top: 18px; }
+.dos-band .eyebrow::before { background: #fff; }
+.dos-band .hero { color: #fff; }
+.dos-band .dos-lede, .dos-band .actu { color: #fff; }
+.dos-band .actu { border-left-color: #fff; }
+.dos-band .actu span { color: rgba(255, 255, 255, .85); }
+.dos-band a { color: #fff; text-decoration-color: rgba(255, 255, 255, .7); }
+.dos-band .btn.ghost { color: #fff; border-color: #fff; }
+.dos-band .btn.ghost:hover { background: rgba(255, 255, 255, .12); }
+.dos-band a.link, .dos-band .go { color: #fff; border-bottom-color: #fff; }
+.dos-band .answers { margin-bottom: 0; }
+/* Onglets du dossier, collés sous l'en-tête */
+.dos-tabs { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 57px); z-index: 5; display: flex; gap: 22px; overflow-x: auto; scrollbar-width: none; margin: 0 0 20px; padding: 10px 0 0; background: var(--paper); border-bottom: 1px solid var(--ink); box-shadow: 0 0 0 100vmax var(--paper); clip-path: inset(0 -100vmax); }
+.dos-tabs a { flex: none; font-weight: 700; color: var(--muted); text-decoration: none; padding: 2px 0 8px; border-bottom: 3px solid transparent; }
+.dos-tabs a:hover, .dos-tabs a.on { color: var(--ink); }
+.dos-tabs a.on { border-bottom-color: var(--money); }
+#tab-dossier section[id] { scroll-margin-top: 120px; }
+/* Recherche par NPA */
+.npa-pick input { font: inherit; font-size: 1.05rem; font-weight: 700; padding: 10px 14px; border: 2px solid var(--ink); background: var(--card); color: var(--ink); width: min(100%, 300px); }
+.conf-filters .or { color: var(--muted); font-size: var(--fs-sm); }
+.npa-res { flex-basis: 100%; margin: 0; }
+.npa-res:empty { display: none; }
+.npa-res .chip small { color: var(--muted); font-weight: 700; margin-left: 2px; }
+.npa-res .chip { background: var(--card); color: var(--ink); font-size: var(--fs-sm); font-weight: 600; padding: 6px 12px; }
