@@ -472,3 +472,22 @@ button.link:focus-visible { outline: 3px solid var(--focus); }
   .sheet-panel { animation: slide .18s ease-out; }
   @keyframes slide { from { transform: translateX(24px); opacity: .6; } }
 }
+
+/* Dossiers (sujets qui fâchent) : en fin de fichier pour passer après .hero, .lede et .une */
+.dos-hero { font-size: clamp(2rem, 5.4vw, 3.6rem); max-width: 22ch; }
+.dos-hero a { color: inherit; text-decoration: none; }
+.dos-hero a:hover { text-decoration: underline; text-decoration-color: var(--money); text-decoration-thickness: 4px; }
+.dos-lede { font-size: 1.12rem; max-width: 62ch; margin: 0 0 22px; }
+.dos-lede .go { display: inline-block; margin-left: 4px; }
+.dos-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); margin: 0 0 32px; }
+.dos-grid .big { font-size: 2.1rem; }
+.dos-grid h3 { font-size: 1rem; }
+#tab-dossier .card { margin: 0 0 20px; }
+#tab-dossier .answers { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 28px; }
+.dos-votes { display: grid; gap: 10px; }
+@media (max-width: 640px) {
+  .dos-hero { font-size: 1.9rem; }
+  .dos-lede { font-size: 1rem; }
+  .dos-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dos-grid .big { font-size: 1.6rem; }
+}

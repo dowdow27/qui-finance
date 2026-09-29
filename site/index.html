@@ -17,6 +17,7 @@
     <a class="brand" href="#chercher">Qui finance ?</a>
     <nav class="tabs" aria-label="Sections">
       <a href="#chercher" data-tab="chercher">Accueil</a>
+      <a href="#dossier" data-tab="dossier">Dossiers</a>
       <a href="#tendances" data-tab="tendances" data-group="tendances absences lobbyistes">Classements</a>
       <a href="#jouer" data-tab="jouer">Jouer</a>
       <a href="#dons" data-tab="dons" data-group="dons votations parlement reseaux trends nouveautes">Données</a>
@@ -28,8 +29,8 @@
 
 <main class="wrap">
   <section id="tab-chercher" class="tab">
-    <p class="eyebrow">Transparence démocratique</p>
-    <h1 class="hero">Qui paie vos élus ?<br>Qui paie le oui et le non ?</h1>
+    <div id="dos-home"><p class="eyebrow">Transparence démocratique</p>
+    <h1 class="hero">Qui paie vos élus ?<br>Qui paie le oui et le non ?</h1></div>
     <p class="lede">Vous ne choisissez ni votre canton ni les objets soumis au vote. Ici, vous voyez l'argent derrière les deux : les mandats et les donateurs de vos élus, les budgets de campagne de chaque votation.</p>
     <section class="card mes-elus" id="mes-elus" aria-label="Vos élus"><p class="note">Chargement…</p></section>
     <section class="card vot-home" id="vot-home" aria-label="Votations fédérales"><p class="note">Chargement…</p></section>
@@ -46,6 +47,8 @@
     <p class="note more-links">Aussi : <a href="#engager">S'engager</a><a href="#debats">Débats</a><a href="#nouveautes">Nouveautés</a><a href="#reseaux">Réseaux</a></p>
     <p class="note" id="news-line" hidden></p>
   </section>
+
+  <section id="tab-dossier" class="tab" hidden><div id="dossier"></div></section>
 
   <section id="tab-dons" class="tab" hidden>
     <nav class="subnav" aria-label="Données"><span class="subnav-label">Données :</span><a href="#dons">Dons</a><a href="#votations">Votations</a><a href="#parlement">Parlement</a><a href="#reseaux">Réseaux</a><a href="#trends">Tendances</a><a href="#nouveautes" class="if-news">Nouveautés</a></nav>

@@ -53,7 +53,7 @@ function buildIndexes() {
 }
 
 /* ---------------- Navigation ---------------- */
-const TABS = ["chercher", "jouer", "absences", "lobbyistes", "reseaux", "dons", "votations", "parlement", "tendances", "trends", "engager", "debats", "nouveautes"];
+const TABS = ["chercher", "dossier", "jouer", "absences", "lobbyistes", "reseaux", "dons", "votations", "parlement", "tendances", "trends", "engager", "debats", "nouveautes"];
 let TAB_CUR = "";
 function route() {
   const [tab, ...qs] = decodeURIComponent(location.hash.slice(1)).split(":");
@@ -69,6 +69,7 @@ function route() {
   document.querySelector(".tabs a[aria-current]")?.scrollIntoView({ inline: "center", block: "nearest" });
   if (t === "chercher" && q != null && $("#q").value !== q) { $("#q").value = q; search(); }
   if (t === "tendances") { renderClassements(); if (q) requestAnimationFrame(() => $(`#cl-${CSS.escape(q)}`)?.scrollIntoView({ block: "start" })); }
+  if (t === "dossier") renderDossier(q);
   if (t === "trends") renderTrends();
   if (t === "jouer") renderJouer(q);
   if (t === "absences") renderAbsences();
@@ -1234,6 +1235,115 @@ async function renderUne() {
   if (t.length) box.innerHTML = html(pctInt(Math.max(...t)));
 }
 
+/* ---------------- Dossiers : les sujets qui fâchent ---------------- */
+/* Un dossier = groupes d'intérêts Lobbywatch (mandats rémunérés), secteurs des donateurs (config/secteurs.csv), votations et votes au National par mots-clés.
+   Même règle pour tous les partis, et un contre-poids quand il existe (locataires, syndicats, patients). Un mandat n'est pas une faute. */
+const DOSSIERS = [
+  { id: "primes", nom: "Primes maladie", q: "Primes maladie : qui paie vos élus ?", qui: "les caisses maladie",
+    groupes: ["Caisses maladie"], face: { qui: "les associations de patients", groupes: ["Patient·e·x·s"] },
+    donSecteurs: ["Santé et pharma"], donRx: /curafutura|santesuisse|prio swiss|groupe mutuel|helsana|\bcss\b|sanitas|visana|swica|concordia|assura|krankenvers/, donQui: "les caisses maladie, les médecins et la pharma",
+    vRx: /prime|couts dans le systeme de sante|prestations ambulatoires/, sRx: /assurance maladie|lamal|lsamal/,
+    une: (r) => [`${r.elus.length} élus`, "payés par des caisses maladie", `${r.nCom} d'entre eux siègent dans la commission de la santé, qui prépare les lois sur les primes.`] },
+  { id: "loyers", nom: "Loyers", q: "Loyers : qui paie vos élus ?", qui: "l'immobilier",
+    groupes: ["Immobilier et propriétaires fonciers"], face: { qui: "les associations de locataires", groupes: ["Locataire·x·s"] },
+    donSecteurs: ["Immobilier et logement"], donQui: "les propriétaires et l'immobilier",
+    vRx: /bail|sous location|besoin propre|residences secondaires|valeur locative/, sRx: /droit du bail|\bbail\b|\bloyers?\b|locataires?|\blogement\b|valeur locative/,
+    une: (r) => [`${short(r.total)} CHF`, "déclarés par les propriétaires et l'immobilier", `${r.elus.length} élus sont payés par l'immobilier, ${r.face.length} par les associations de locataires.`] },
+  { id: "retraites", nom: "Retraites", q: "AVS et LPP : qui paie vos élus ?", qui: "les assureurs et les caisses de pension",
+    groupes: ["Fonds de pension et de retraite", "Assurances"], face: { qui: "les syndicats", groupes: ["Organisations de travailleur·euse·x·s"], donSecteurs: ["Syndicats"] },
+    donSecteurs: ["Assurances"], donQui: "les assureurs",
+    vRx: /\bavs\b|\brentes?\b|prevoyance professionnelle|retraite/, sRx: /\bavs\b|\blavs\b|\blpp\b|prevoyance professionnelle|13e rente/,
+    une: (r) => [`${r.elus.length} élus`, "payés par les assureurs et les caisses de pension", `${r.face.length} élus sont payés par les syndicats.`] },
+  { id: "banques", nom: "Banques", q: "Banques : qui paie vos élus ?", qui: "les banques",
+    groupes: ["Banques", "Société d'investissement"], donSecteurs: ["Banques et finance"], donQui: "les banques",
+    vRx: /argent liquide|numeraire/, sRx: /\bbanques\b|bancaire|too big to fail|fonds propres|impot anticipe/,
+    une: (r) => [`${short(r.total)} CHF`, "donnés par les banques", `dont ${short(r.top[0]?.[1] || 0)} CHF de ${r.top[0]?.[0] || "–"}. ${r.elus.length} élus sont payés par des banques.`] },
+  { id: "agriculture", nom: "Agriculture", q: "Agriculture : qui paie vos élus ?", qui: "le monde agricole",
+    groupes: ["Agriculture en général", "Industrie laitière", "Elevage d'animaux", "Elevage de volailles", "Promotion en agriculture", "Agriculture écologique", "Industrie fruitière", "Nourriture pour animaux / Production végétale"],
+    donSecteurs: ["Agriculture"], donQui: "le monde agricole",
+    vRx: /alimentation|biodiversite|agricol|pesticide|elevage/, sRx: /agriculture|\blagr\b|agricole|paysan/,
+    une: (r) => [`${r.elus.length} élus`, "payés par le monde agricole", `${r.nCom} d'entre eux siègent dans la commission de l'économie, qui prépare la politique agricole.`] },
+];
+const DOS = new Map();
+function dossierData(d) {
+  if (DOS.has(d.id)) return DOS.get(d.id);
+  const payes = (groupes) => { const G = new Set(groupes);
+    return L.elus.map((e) => ({ e, ls: e.liens.filter((l) => l.statut === "remunere" && G.has(l.groupe)) })).filter((x) => x.ls.length)
+      .sort((a, b) => b.ls.length - a.ls.length || sum(b.ls, (l) => l.montant) - sum(a.ls, (l) => l.montant)); };
+  const coms = uniq(d.groupes.flatMap((g) => L.commissions?.[g] || []));
+  const elus = payes(d.groupes), face = d.face ? payes(d.face.groupes) : [];
+  elus.forEach((x) => { x.com = (x.e.commissions || "").split(",").map((c) => c.trim().split("-")[0]).find((c) => coms.includes(c)); });
+  const dons = A.dons.filter((x) => d.donSecteurs.includes(x.secteur) || d.donRx?.test(norm(x.donateur)));
+  const by = {}; dons.forEach((x) => { by[x.donateur] = (by[x.donateur] || 0) + (x.montant || 0); });
+  const faceDons = d.face?.donSecteurs ? A.dons.filter((x) => d.face.donSecteurs.includes(x.secteur)) : [];
+  const vs = V.filter((v) => d.vRx.test(norm(`${v.titre} ${v.titre_off}`))).sort((a, b) => b.date.localeCompare(a.date));
+  const r = { elus, face, coms, nCom: elus.filter((x) => x.com).length, dons, total: sum(dons, (x) => x.montant), top: Object.entries(by).sort((a, b) => b[1] - a[1]), faceDons, vs };
+  DOS.set(d.id, r); return r;
+}
+const today = () => (M.genere || new Date().toISOString()).slice(0, 10);
+const prochaineVot = (d) => dossierData(d).vs.filter((v) => v.statut === "À venir" && v.date >= today()).at(-1);
+function dossierDuMoment() {
+  const forced = DOSSIERS.find((x) => x.id === window.QF?.DOSSIER); if (forced) return forced;
+  const vot = DOSSIERS.map((d) => ({ d, v: prochaineVot(d) })).filter((x) => x.v).sort((a, b) => a.v.date.localeCompare(b.v.date))[0];  // une votation à venir passe devant
+  return vot?.d || DOSSIERS[Math.floor(Date.parse(today()) / 6048e5) % DOSSIERS.length];
+}
+const dosPhrase = (d) => { const [, , phrase] = d.une(dossierData(d)), v = prochaineVot(d); return `${phrase}${v ? ` Le ${dateFr(v.date)}, vous votez : « ${v.titre} ».` : ""}`; };
+const dosShare = (d) => { const r = dossierData(d), [big, suite] = d.une(r);
+  return shareBtn(`dos-${d.id}`, () => shareCard({ kicker: `Dossier · ${d.nom}`, title: d.q, big, lines: [`${suite}.`, dosPhrase(d)], text: `${d.q} ${big} ${suite}.`, file: `dossier-${d.id}.png`, link: `${SITE_URL}#dossier:${d.id}` })); };
+
+function renderDossiersHome() {
+  const box = $("#dos-home"); if (!box || !L.elus.length) return;
+  const d = dossierDuMoment(), [big, suite] = d.une(dossierData(d));
+  box.innerHTML = `<p class="eyebrow">Dossier du moment · ${esc(d.nom)}</p>
+    <h1 class="hero dos-hero"><a href="#dossier:${d.id}">${esc(big)} ${esc(suite)}</a></h1>
+    <p class="dos-lede">${esc(dosPhrase(d))} <a class="go" href="#dossier:${d.id}">Lire le dossier →</a></p>
+    <div class="grid une dos-grid">${DOSSIERS.filter((x) => x !== d).map((x) => { const [b, s] = x.une(dossierData(x));
+      return `<a class="card une-card" href="#dossier:${x.id}"><p class="eyebrow-s">${esc(x.nom)}</p><p class="big money">${esc(b)}</p><h3>${esc(s)}</h3><span class="go">Lire →</span></a>`; }).join("")}</div>`;
+}
+
+function renderDossier(id) {
+  const box = $("#dossier"); if (!box) return;
+  const d = DOSSIERS.find((x) => x.id === id) || dossierDuMoment(), r = dossierData(d), [big, suite] = d.une(r);
+  if (box.dataset.id !== d.id) window.scrollTo(0, 0); box.dataset.id = d.id;
+  const sieges = {}; L.elus.forEach((e) => { sieges[e.parti] = (sieges[e.parti] || 0) + 1; });
+  const parti = {}; r.elus.forEach((x) => { parti[x.e.parti] = (parti[x.e.parti] || 0) + 1; });
+  const pp = Object.entries(parti).filter(([p]) => sieges[p] >= 3).map(([p, n]) => ({ label: `${p} : ${n} sur ${sieges[p]}`, value: 100 * n / sieges[p], cls: `f-${fcls(PARTI_F[p])}` })).sort((a, b) => b.value - a.value);
+  const petits = Object.entries(parti).filter(([p]) => sieges[p] < 3);
+  const eluRow = (x) => `<li><span>${linkBtn("elu", x.e.id, x.e.nom)} <small class="note">${esc(x.e.parti)}, ${esc(x.e.canton)}, ${x.e.conseil}</small></span><span class="tag paid">${x.ls.length} mandat${x.ls.length > 1 ? "s" : ""}</span>
+    <span class="sub">${x.ls.map((l) => `${esc(l.org)}${l.montant ? ` (${chf(l.montant)})` : ""}`).join(" · ")}${x.com ? ` · <b>siège à la ${esc(comLbl(x.com))}</b>` : ""}</span></li>`;
+  const dest = {}; r.dons.forEach((x) => { const k = x.parti || (x.cat === "Votation" ? `Votations, camp du ${x.camp === "Pour" ? "oui" : "non"}` : x.cat === "Parti" ? "Autres partis" : x.cat); dest[k] = (dest[k] || 0) + (x.montant || 0); });
+  const faceTot = sum(r.faceDons, (x) => x.montant);
+  box.innerHTML = `<nav class="subnav" aria-label="Dossiers"><span class="subnav-label">Dossiers :</span>${DOSSIERS.map((x) => `<a href="#dossier:${x.id}"${x === d ? ' class="on"' : ""}>${esc(x.nom)}</a>`).join("")}</nav>
+  <p class="eyebrow">Dossier · ${esc(d.nom)}</p>
+  <h1 class="hero dos-hero">${esc(big)} ${esc(suite)}</h1>
+  <p class="dos-lede">${esc(dosPhrase(d))}</p>
+  <div class="answers">${dosShare(d)}${API ? `<a class="btn ghost" href="#debats">En débattre</a>` : ""}<a class="link" href="#chercher">Et vos élus ? →</a></div>
+  <section class="card"><p class="eyebrow-s">Les élus</p><h2 class="qs-q">Qui est payé par ${esc(d.qui)} ?</h2>
+    <div class="kpis">${kpi(r.elus.length, "élus fédéraux payés", "money")}${kpi(sum(r.elus, (x) => x.ls.length), "mandats rémunérés")}${r.coms.length ? kpi(r.nCom, `siègent à la ${r.coms.map(comLbl).join(" ou à la ")}`) : ""}${d.face ? kpi(r.face.length, `payés par ${d.face.qui}`, "infl") : ""}</div>
+    ${pp.length ? `<p class="hint">Par parti : part des élus fédéraux du parti payés par ${esc(d.qui)}</p>${bars(pp, "m", pctInt)}${petits.length ? `<p class="note">Petits partis : ${petits.map(([p, n]) => `${esc(p)} ${n} sur ${sieges[p]}`).join(", ")}.</p>` : ""}` : ""}
+    ${r.elus.length ? `<p class="hint">Par élu</p>${listMore(r.elus.map(eluRow), 10, "élus")}` : `<p class="note">Aucun mandat rémunéré déclaré dans ce secteur.</p>`}
+    ${d.face && r.face.length ? `<details class="more"><summary>Et ${r.face.length} élu${r.face.length > 1 ? "s" : ""} payé${r.face.length > 1 ? "s" : ""} par ${esc(d.face.qui)}</summary>${listMore(r.face.map(eluRow), 10, "élus")}</details>` : ""}
+    <p class="note">Mandats rémunérés déclarés, classés par Lobbywatch. Un mandat « non communiqué » n'est pas compté, même s'il est peut-être payé. Un mandat n'est pas une faute : c'est une information.</p>${stamp("Lobbywatch")}</section>
+  <section class="card"><p class="eyebrow-s">L'argent</p><h2 class="qs-q">Combien donnent ${esc(d.donQui)} ?</h2>
+    <div class="kpis">${kpi(`${short(r.total)} CHF`, "dons déclarés depuis 2023", "money")}${kpi(r.top.length, "donateurs")}${d.face?.donSecteurs ? kpi(`${short(faceTot)} CHF`, `donnés par ${d.face.qui}`, "infl") : ""}</div>
+    ${r.top.length ? `<p class="hint">Plus gros donateurs</p>${barsMore(r.top.map(([k, v]) => ({ label: k, value: v, open: ["donor", k] })), "m")}<p class="hint">Où va l'argent</p>${bars(Object.entries(dest).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, cls: PARTI_F[k] ? `f-${fcls(PARTI_F[k])}` : "" })), "m")}` : `<p class="note">Aucun don déclaré.</p>`}
+    <p class="note">Dons de plus de 15 000 CHF aux partis et dons aux campagnes de plus de 50 000 CHF, déclarés au Contrôle fédéral des finances. Secteur déduit du nom du donateur.</p>${stamp("CDF")}</section>
+  ${r.vs.length ? `<section class="card"><p class="eyebrow-s">Votations</p><h2 class="qs-q">Et le peuple ?</h2><div class="dos-votes">${r.vs.map(voteRow).join("")}</div>${stamp("Swissvotes, CDF")}</section>` : ""}
+  <section class="card"><p class="eyebrow-s">Conseil national</p><h2 class="qs-q">Les élus payés par ${esc(d.qui)} votent-ils comme les autres ?</h2><div id="dos-cn"><p class="note">Chargement…</p></div>${stamp("Services du Parlement, Lobbywatch")}</section>`;
+  fillDossierCN(d, r);
+}
+async function fillDossierCN(d, r) {
+  const p = await loadParl(), box = $("#dos-cn"); if (!box) return;
+  const payes = new Set(r.elus.filter((x) => x.e.conseil === "CN").map((x) => x.e.pn));
+  const ss = p ? p.scrutins.filter((s) => ["Vote final", "Vote sur l'ensemble"].includes(s[5]) && d.sRx.test(s._n)).filter((s, i, a) => a.findIndex((x) => (x[4] || x[3]) === (s[4] || s[3])) === i).slice(0, 8) : [];  // un objet voté deux fois : le plus récent
+  if (!ss.length || !payes.size) { box.innerHTML = `<p class="note">Pas de vote final sur ce sujet dans la législature en cours, ou aucun élu payé par le secteur au Conseil national.</p>`; return; }
+  const part = (s, dans) => { let o = 0, n = 0; p.membres.forEach((m, i) => { if (payes.has(m[0]) !== dans) return; const c = s[8][i]; if (c === "o") o++; if (c === "n") n++; }); return { o, n, pc: o + n ? 100 * o / (o + n) : null }; };
+  box.innerHTML = `<ul class="list">${ss.map((s) => { const a = part(s, true), b = part(s, false);
+    return `<li><span>${linkBtn("scrutin", s[0], s[4] || s[3])}</span><span class="nowrap"><b class="money">${a.pc == null ? "–" : pctInt(a.pc)}</b> / ${b.pc == null ? "–" : pctInt(b.pc)}</span>
+      <span class="sub">${esc(dateFr(s[1]))} · ${esc(s[5])} · élus payés par le secteur : ${a.o} oui, ${a.n} non · autres élus : ${b.o} oui, ${b.n} non. Oui = ${esc(trVote(s[6]) || "–")}</span></li>`; }).join("")}</ul>
+    <p class="note">Part de oui chez les ${payes.size} élus du National payés par ${esc(d.qui)}, puis chez tous les autres. Un écart peut venir de leur parti plutôt que du mandat : ouvrez un vote pour le détail par groupe.</p>`;
+}
+
 /* ---------------- Réseaux (carte à bulles élus × organisations) ---------------- */
 const F_COLORS = { G: "#6FA83A", S: "#D93A3A", GL: "#B3AE1F", ME: "#EF8C00", RL: "#2F6DB3", V: "#1F6B35", X: "#9AA4AE" };  // pour l'image partagée (thème clair)
 let NET = null;  // dernière carte calculée (pour l'image partagée)
@@ -1731,7 +1841,7 @@ document.addEventListener("input", (ev) => {
 
 (async function init() {
   [M, A, L, C, T, V] = await Promise.all([getJSON("meta", {}), getJSON("argent", { dons: [], campagnes: [] }), getJSON("lobby", { elus: [], liens: [], badges: [] }), getJSON("changes", []), getJSON("timeline", []), getJSON("votations", [])]);
-  buildIndexes(); status(); suggestions(); renderQuestion(); renderVotHome(); renderMesElus(); renderSpotlight(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
+  buildIndexes(); status(); suggestions(); renderDossiersHome(); renderQuestion(); renderVotHome(); renderMesElus(); renderSpotlight(); renderUne(); setupDons(); setupVotes(); setupParl(); renderHemis(); renderNews();
   if (!C.length) document.querySelectorAll('a[href="#nouveautes"]').forEach((a) => (a.hidden = true));  // rien à montrer avant la 2e mise à jour
   else { const w = C[0], n = (w.dons_nouveaux || []).length, m = (w.mandats_nouveaux || []).length; const nl = $("#news-line"); nl.hidden = false; nl.innerHTML = `Cette semaine : ${n} nouveau${n > 1 ? "x" : ""} don${n > 1 ? "s" : ""}, ${m} nouveau${m > 1 ? "x" : ""} mandat${m > 1 ? "s" : ""}. <a href="#nouveautes">Voir les nouveautés →</a>`; }
   $("#fdb-tri").addEventListener("input", renderDebats);
