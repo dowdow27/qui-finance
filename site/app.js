@@ -606,8 +606,11 @@ async function shareCard({ kicker = "Qui finance ?", title, big, bigColor = "#C8
   x.fillStyle = "#111111"; x.font = F(500, 40);
   for (const line of lines) for (const l of wrapLines(x, line, W - 160)) { y += 58; if (y > H - 170) break; x.fillText(l, 80, y); }
   x.fillStyle = "#111111"; x.fillRect(80, H - 150, W - 160, 2);
-  x.font = F(700, 28); x.letterSpacing = "4px"; x.fillText("TRANSPARENCE DÉMOCRATIQUE", 80, H - 100); x.letterSpacing = "0px";
-  x.fillStyle = "#5F6873"; x.font = F(500, 30); x.fillText(SITE_URL.replace(/^https?:\/\//, ""), 80, H - 56);
+  // Logo « tampon » (img/logo.svg) : carré rouge, « ? » blanc, 80 px dans le pied
+  x.save(); x.translate(80, H - 126); x.scale(.8, .8); x.fillStyle = "#DA291C"; x.fillRect(0, 0, 100, 100);
+  x.fillStyle = "#FFFFFF"; x.fill(new Path2D("M28 15H72V57H57V63H43V43H58V29H42V39H28Z M43 71H57V85H43Z")); x.restore();
+  x.fillStyle = "#111111"; x.font = F(800, 34); x.fillText("Qui finance", 184, H - 94);
+  x.fillStyle = "#5F6873"; x.font = F(500, 28); x.fillText(SITE_URL.replace(/^https?:\/\//, ""), 184, H - 56);
   const blob = await new Promise((r) => c.toBlob(r, "image/png"));
   const f = new File([blob], file, { type: "image/png" }), msg = `${text} ${link || SITE_URL}`.trim();
   if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f], text: msg }); return; } catch (e) { if (e.name === "AbortError") return; } }

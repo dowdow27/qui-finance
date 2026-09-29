@@ -64,8 +64,8 @@ a:hover, button.link:hover { text-decoration-color: var(--money); text-decoratio
   backdrop-filter: blur(8px); border-bottom: 1px solid var(--rule);
 }
 .top-inner { display: flex; align-items: center; gap: 24px; min-height: 56px; }
-.brand { font-weight: 800; font-size: var(--fs-h4); color: var(--ink); text-decoration: none; white-space: nowrap; }
-.brand::before { content: ""; display: inline-block; width: .7em; height: .7em; margin-right: .45em; background: var(--money); }
+.brand { display: inline-flex; align-items: center; gap: .45em; font-weight: 800; font-size: var(--fs-h4); letter-spacing: -.02em; color: var(--ink); text-decoration: none; white-space: nowrap; }
+.brand img { width: 1.5em; height: 1.5em; flex: none; }  /* logo « tampon » : carré rouge, « ? » blanc (img/logo.svg) */
 .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; align-self: stretch; }
 .tabs a { display: flex; align-items: center; padding: 0 11px; color: var(--muted); text-decoration: none; white-space: nowrap; font-weight: 700; border-bottom: 3px solid transparent; }
 .tabs a:hover { color: var(--ink); }

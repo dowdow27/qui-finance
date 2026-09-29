@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logo Qui finance</title>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;800&display=swap" rel="stylesheet">
+<style>
+:root { --ink:#16202A; --red:#DA291C; --paper:#F3F4F1; --muted:#5F6873; }
+body { margin:0; background:var(--paper); color:var(--ink); font:500 16px/1.5 "Schibsted Grotesk", Arial, sans-serif; }
+main { max-width:1100px; margin:0 auto; padding:32px 16px 64px; }
+h1 { font-size:2rem; font-weight:800; letter-spacing:-.03em; margin:0 0 4px; }
+.intro { color:var(--muted); margin:0 0 32px; max-width:70ch; }
+.prop { background:#fff; border-top:2px solid var(--ink); padding:20px 22px 24px; margin:0 0 24px; }
+.prop h2 { font-size:.75rem; letter-spacing:.14em; text-transform:uppercase; margin:0 0 4px; display:flex; gap:8px; align-items:center; }
+.prop h2::before { content:""; width:10px; height:10px; background:var(--red); }
+.prop p { color:var(--muted); margin:0 0 18px; max-width:70ch; }
+.row { display:flex; flex-wrap:wrap; gap:28px; align-items:center; }
+.tile { display:grid; gap:6px; justify-items:start; }
+.tile small { color:var(--muted); font-size:.75rem; }
+.dark { background:var(--ink); padding:14px 18px; }
+.wm { display:flex; align-items:center; gap:.2em; font-weight:800; letter-spacing:-.04em; line-height:1; white-space:nowrap; }
+.wm svg { height:.74em; width:auto; }
+.big { font-size:64px; } .mid { font-size:22px; }
+.dark .wm { color:#fff; }
+.ico { display:block; }
+</style></head><body><main>
+<h1>Logo « Qui finance ? »</h1>
+<p class="intro">Trois pistes dans la direction « Affiche » du site : grotesque noire, carré rouge, géométrie carrée. Chaque piste en grand, en en-tête, sur fond sombre, et en icône (onglet du navigateur et réseaux). Le point d'interrogation est dessiné, pas tiré d'une police : il reste net à 16 pixels.</p>
+
+<!-- Glyphe « ? » carré, grille de 40 × 70 -->
+<svg width="0" height="0" style="position:absolute"><defs>
+  <g id="q-hook"><path d="M0 0H44V42H29V48H15V28H30V14H14V24H0Z"/></g>
+</defs></svg>
+
+<section class="prop">
+<h2>A · Le point rouge</h2>
+<p>Le mot, puis un point d'interrogation carré dont le point est le carré rouge du site. Sobre, lisible, la question reste le cœur. Icône : le « ? » seul.</p>
+<div class="row">
+  <div class="tile"><div class="wm big">Qui finance<svg viewBox="0 0 44 70"><use href="#q-hook" fill="currentColor"/><rect x="15" y="56" width="14" height="14" fill="var(--red)"/></svg></div><small>grand</small></div>
+</div>
+<div class="row" style="margin-top:18px">
+  <div class="tile"><div class="wm mid">Qui finance<svg viewBox="0 0 44 70"><use href="#q-hook" fill="currentColor"/><rect x="15" y="56" width="14" height="14" fill="var(--red)"/></svg></div><small>en-tête</small></div>
+  <div class="tile"><div class="dark"><div class="wm mid">Qui finance<svg viewBox="0 0 44 70"><use href="#q-hook" fill="currentColor"/><rect x="15" y="56" width="14" height="14" fill="#F0555D"/></svg></div></div><small>fond sombre</small></div>
+  <div class="tile"><svg class="ico" width="96" height="96" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fff"/><g transform="translate(28 15)"><use href="#q-hook" fill="#16202A"/><rect x="15" y="56" width="14" height="14" fill="#DA291C"/></g></svg><small>icône 96 px</small></div>
+  <div class="tile"><svg class="ico" width="32" height="32" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fff"/><g transform="translate(28 15)"><use href="#q-hook" fill="#16202A"/><rect x="15" y="56" width="14" height="14" fill="#DA291C"/></g></svg><small>32 px</small></div>
+  <div class="tile"><svg class="ico" width="16" height="16" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fff"/><g transform="translate(28 15)"><use href="#q-hook" fill="#16202A"/><rect x="15" y="56" width="14" height="14" fill="#DA291C"/></g></svg><small>16 px</small></div>
+</div>
+</section>
+
+<section class="prop">
+<h2>B · Le tampon</h2>
+<p>Un bloc rouge plein avec le « ? » blanc, comme un tampon posé sur un document officiel. Le plus visible des trois, fort sur les réseaux et en favicon.</p>
+<div class="row">
+  <div class="tile"><div class="wm big"><svg viewBox="0 0 100 100" style="height:1em"><rect width="100" height="100" fill="var(--red)"/><g transform="translate(28 15)"><use href="#q-hook" fill="#fff"/><rect x="15" y="56" width="14" height="14" fill="#fff"/></g></svg>Qui finance</div><small>grand</small></div>
+</div>
+<div class="row" style="margin-top:18px">
+  <div class="tile"><div class="wm mid"><svg viewBox="0 0 100 100" style="height:1em"><rect width="100" height="100" fill="var(--red)"/><g transform="translate(28 15)"><use href="#q-hook" fill="#fff"/><rect x="15" y="56" width="14" height="14" fill="#fff"/></g></svg>Qui finance</div><small>en-tête</small></div>
+  <div class="tile"><div class="dark"><div class="wm mid"><svg viewBox="0 0 100 100" style="height:1em"><rect width="100" height="100" fill="#DA291C"/><g transform="translate(28 15)"><use href="#q-hook" fill="#fff"/><rect x="15" y="56" width="14" height="14" fill="#fff"/></g></svg>Qui finance</div></div><small>fond sombre</small></div>
+  <div class="tile"><svg class="ico" width="96" height="96" viewBox="0 0 100 100"><rect width="100" height="100" fill="#DA291C"/><g transform="translate(28 15)"><use href="#q-hook" fill="#fff"/><rect x="15" y="56" width="14" height="14" fill="#fff"/></g></svg><small>icône 96 px</small></div>
+  <div class="tile"><svg class="ico" width="32" height="32" viewBox="0 0 100 100"><rect width="100" height="100" fill="#DA291C"/><g transform="translate(28 15)"><use href="#q-hook" fill="#fff"/><rect x="15" y="56" width="14" height="14" fill="#fff"/></g></svg><small>32 px</small></div>
+  <div class="tile"><svg class="ico" width="16" height="16" viewBox="0 0 100 100"><rect width="100" height="100" fill="#DA291C"/><g transform="translate(28 15)"><use href="#q-hook" fill="#fff"/><rect x="15" y="56" width="14" height="14" fill="#fff"/></g></svg><small>16 px</small></div>
+</div>
+</section>
+
+<section class="prop">
+<h2>C · Le cadre</h2>
+<p>Un « Q » carré : un cadre noir (le document, le registre) dont la queue est le carré rouge qui en sort, comme l'argent qui dépasse. Plus conceptuel, monogramme fort.</p>
+<svg width="0" height="0" style="position:absolute"><defs><g id="qf"><path d="M0 0H70V70H0Z M16 16V54H54V16Z" fill-rule="evenodd"/></g></defs></svg>
+<div class="row">
+  <div class="tile"><div class="wm big"><svg viewBox="0 0 90 90" style="height:1em"><use href="#qf" fill="currentColor"/><rect x="52" y="52" width="38" height="38" fill="var(--red)"/></svg>Qui finance ?</div><small>grand</small></div>
+</div>
+<div class="row" style="margin-top:18px">
+  <div class="tile"><div class="wm mid"><svg viewBox="0 0 90 90" style="height:1em"><use href="#qf" fill="currentColor"/><rect x="52" y="52" width="38" height="38" fill="var(--red)"/></svg>Qui finance ?</div><small>en-tête</small></div>
+  <div class="tile"><div class="dark"><div class="wm mid"><svg viewBox="0 0 90 90" style="height:1em"><use href="#qf" fill="currentColor"/><rect x="52" y="52" width="38" height="38" fill="#F0555D"/></svg>Qui finance ?</div></div><small>fond sombre</small></div>
+  <div class="tile"><svg class="ico" width="96" height="96" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fff"/><g transform="translate(8 8) scale(.93)"><use href="#qf" fill="#16202A"/><rect x="52" y="52" width="38" height="38" fill="#DA291C"/></g></svg><small>icône 96 px</small></div>
+  <div class="tile"><svg class="ico" width="32" height="32" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fff"/><g transform="translate(8 8) scale(.93)"><use href="#qf" fill="#16202A"/><rect x="52" y="52" width="38" height="38" fill="#DA291C"/></g></svg><small>32 px</small></div>
+  <div class="tile"><svg class="ico" width="16" height="16" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fff"/><g transform="translate(8 8) scale(.93)"><use href="#qf" fill="#16202A"/><rect x="52" y="52" width="38" height="38" fill="#DA291C"/></g></svg><small>16 px</small></div>
+</div>
+</section>
+</main></body></html>
