@@ -1239,7 +1239,7 @@ async function renderUne() {
 /* Un dossier = groupes d'intérêts Lobbywatch (mandats rémunérés), secteurs des donateurs (config/secteurs.csv), votations et votes au National par mots-clés.
    Même règle pour tous les partis, et un contre-poids quand il existe (locataires, syndicats, patients). Un mandat n'est pas une faute. */
 const DOSSIERS = [
-  { id: "primes", nom: "Primes maladie", q: "Primes maladie : qui paie vos élus ?", qui: "les caisses maladie",
+  { id: "primes", nom: "Primes maladie", q: "Primes maladie : qui paie vos élus ?", qui: "les caisses maladie", saison: [9, 10],  // primes de l'année suivante annoncées fin septembre
     groupes: ["Caisses maladie"], face: { qui: "les associations de patients", groupes: ["Patient·e·x·s"] },
     donSecteurs: ["Santé et pharma"], donRx: /curafutura|santesuisse|prio swiss|groupe mutuel|helsana|\bcss\b|sanitas|visana|swica|concordia|assura|krankenvers/, donQui: "les caisses maladie, les médecins et la pharma",
     vRx: /prime|couts dans le systeme de sante|prestations ambulatoires/, sRx: /assurance maladie|lamal|lsamal/,
@@ -1284,6 +1284,7 @@ const today = () => (M.genere || new Date().toISOString()).slice(0, 10);
 const prochaineVot = (d) => dossierData(d).vs.filter((v) => v.statut === "À venir" && v.date >= today()).at(-1);
 function dossierDuMoment() {
   const forced = DOSSIERS.find((x) => x.id === window.QF?.DOSSIER); if (forced) return forced;
+  const mois = +today().slice(5, 7), saison = DOSSIERS.find((x) => x.saison?.includes(mois)); if (saison) return saison;  // l'actualité de saison passe devant
   const vot = DOSSIERS.map((d) => ({ d, v: prochaineVot(d) })).filter((x) => x.v).sort((a, b) => a.v.date.localeCompare(b.v.date))[0];  // une votation à venir passe devant
   return vot?.d || DOSSIERS[Math.floor(Date.parse(today()) / 6048e5) % DOSSIERS.length];
 }
